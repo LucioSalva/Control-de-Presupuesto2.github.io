@@ -1,0 +1,69 @@
+/* ===== Tema oscuro y tipografía en blanco ===== */
+body {
+  background: #fdfdfd;
+  color: #ffffff;
+}
+body,
+body * {
+  color: #ffffff !important;
+}
+.navbar {
+  background: linear-gradient(90deg, #691c32, #bc955c);
+}
+.card {
+  background: #0f1720;
+  border: 1px solid #1f354d;
+}
+.table thead th {
+  border-bottom-color: #1f354d;
+}
+.table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.text-muted-2 {
+  color: #cfd9e3 !important;
+}
+.form-control,
+.form-select {
+  background: #0f1720 !important;
+  color: #ffffff !important;
+  border: 1px solid #1f354d;
+}
+.form-control::placeholder {
+  color: #cccccc !important;
+}
+.alert-soft {
+  background: #0f1720;
+  color: #ffffff;
+  border: 1px dashed #2b4b6a;
+}
+.table {
+  color: #ffffff;
+}
+.table td,
+.table th {
+  border-color: #1f354d !important;
+}
+.spinner {
+  display: none;
+}
+.modal-soft {
+  background: #0f1720;
+  border: 1px solid #1f354d;
+  color: #ffffff;
+}
+.kpi-title {
+  opacity: 0.9;
+  font-size: 0.9rem;
+}
+
+/* ===== Texto negro en tablas ===== */
+.table thead th,
+.table tbody td {
+  color: #000000 !important;
+  background-color: #ffffff !important; /* si quieres fondo blanco en celdas */
+}
+
+.table thead th {
+  font-weight: bold;
+}
