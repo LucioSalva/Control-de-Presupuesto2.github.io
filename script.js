@@ -1,6 +1,4 @@
-// =====================
-// Estado y utilidades
-// =====================
+// ===== utilidades =====
 const money = (v) => {
   if (v === undefined || v === null || isNaN(v)) return '—';
   return v.toLocaleString('es-MX', { style:'currency', currency:'MXN', maximumFractionDigits:2 });
@@ -27,9 +25,49 @@ function banner(msg, type='info'){
 const showSpinner = (v)=> document.getElementById('spinner').style.display = v? 'block':'none';
 const escapeHtml = (s)=> String(s).replace(/[&<>\"']/g, (c)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 
-// =====================
-// Persistencia (localStorage)
-// =====================
+// === API base (ajusta si usas otro puerto/host) ===
+const API_URL = 'http://localhost:3000';
+
+async function apiGet(path){
+  const r = await fetch(API_URL + path);
+  if (!r.ok) throw new Error('GET ' + path + ' ' + r.status);
+  return r.json();
+}
+async function apiPost(path, body){
+  const r = await fetch(API_URL + path, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json' },
+    body: JSON.stringify(body)
+  });
+  const data = await r.json().catch(()=> ({}));
+  if (!r.ok || data.error) throw new Error(data.error || ('POST ' + path));
+  return data;
+}
+
+// Cargar todo desde la BD y poblar STATE
+async function loadFromAPI(){
+  const [partidas, gastos, recon] = await Promise.all([
+    apiGet('/api/partidas'),
+    apiGet('/api/gastos'),
+    apiGet('/api/reconducciones')
+  ]);
+  STATE.presupuesto = partidas.map(p => ({ partida: p.clave, presupuesto: Number(p.presupuesto) }));
+  STATE.gastos = gastos.map(g => ({
+    fecha: g.fecha ? new Date(g.fecha) : null,
+    descripcion: g.descripcion,
+    partida: g.partida_clave || '',
+    monto: Number(g.monto)
+  }));
+  STATE.recon = recon.map(r => ({
+    concepto: r.concepto || '',
+    origen: r.origen,
+    destino: r.destino,
+    monto: Number(r.monto)
+  }));
+}
+
+
+// ===== Persistencia =====
 function saveLS(){
   const data = {
     presupuesto: STATE.presupuesto,
@@ -54,9 +92,6 @@ function resetLS(){
   localStorage.removeItem(LS_KEY);
 }
 
-// =====================
-// Cálculos y render
-// =====================
 function renderAll(){
   STATE.partitdasCatalog = new Set(STATE.presupuesto.map(p => p.partida));
   const filtros = getFiltros();
@@ -184,50 +219,50 @@ function renderChartMensual(gastos, filtros){
   });
 }
 
-// =====================
-// Formularios
-// =====================
-document.getElementById('form-partida').addEventListener('submit', (ev)=>{
+document.getElementById('form-partida').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
-  const partida = document.getElementById('p-partida').value.trim();
-  const monto = parseFloat(document.getElementById('p-monto').value);
-  if (!partida || isNaN(monto)) return banner('Captura partida y presupuesto válidos','warning');
-  const idx = STATE.presupuesto.findIndex(p => p.partida === partida);
-  if (idx >= 0) STATE.presupuesto[idx].presupuesto = monto;
-  else STATE.presupuesto.push({ partida, presupuesto: monto });
-  renderAll();
-  banner('Partida guardada','success');
-  ev.target.reset();
+  const clave = document.getElementById('p-partida').value.trim();
+  const presupuesto = parseFloat(document.getElementById('p-monto').value);
+  if (!clave || isNaN(presupuesto)) return banner('Captura partida y presupuesto válidos','warning');
+  try{
+    await apiPost('/api/partidas', { clave, presupuesto });
+    await loadFromAPI(); renderAll();
+    banner('Partida guardada en BD','success');
+    ev.target.reset();
+  }catch(e){ banner(e.message,'danger'); }
 });
 
-document.getElementById('form-gasto').addEventListener('submit', (ev)=>{
+document.getElementById('form-gasto').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
-  const fecha = document.getElementById('g-fecha').value ? new Date(document.getElementById('g-fecha').value) : null;
+  const fecha = document.getElementById('g-fecha').value || null;
   const descripcion = document.getElementById('g-desc').value.trim();
-  const partida = document.getElementById('g-partida').value.trim();
+  const partida = document.getElementById('g-partida').value.trim() || null; // opcional
   const monto = parseFloat(document.getElementById('g-monto').value);
-  if (!descripcion || isNaN(monto)) return banner('Captura descripción y monto válidos','warning');
-  STATE.gastos.push({ fecha, descripcion, partida, monto });
-  renderAll();
-  banner('Gasto agregado','success');
-  ev.target.reset();
+  if (!descripcion || isNaN(monto) || monto <= 0) return banner('Captura descripción y monto válidos','warning');
+  try{
+    await apiPost('/api/gastos', { fecha, descripcion, partida, monto });
+    await loadFromAPI(); renderAll();
+    banner('Gasto guardado en BD','success');
+    ev.target.reset();
+  }catch(e){ banner(e.message,'danger'); }
 });
 
-document.getElementById('form-recon').addEventListener('submit', (ev)=>{
+document.getElementById('form-recon').addEventListener('submit', async (ev)=>{
   ev.preventDefault();
   const concepto = document.getElementById('r-concepto').value.trim();
-  const partida = document.getElementById('r-partida').value.trim();
+  const origen = document.getElementById('r-origen').value.trim();
+  const destino = document.getElementById('r-destino').value.trim();
   const monto = parseFloat(document.getElementById('r-monto').value);
-  if (!concepto || isNaN(monto)) return banner('Captura concepto y monto válidos','warning');
-  STATE.recon.push({ concepto, partida, monto });
-  renderAll();
-  banner('Reconducción agregada','success');
-  ev.target.reset();
+  if (!origen || !destino || isNaN(monto) || monto <= 0) return banner('Completa origen, destino y monto válido','warning');
+  try{
+    const res = await apiPost('/api/reconducir', { concepto, origen, destino, monto });
+    if (res.negativo) banner(`La partida ${origen} quedó en negativo: ${money(res.presupuestoOrigen)}`, 'danger');
+    await loadFromAPI(); renderAll();
+    banner('Reconducción aplicada (BD)','success');
+    ev.target.reset();
+  }catch(e){ banner(e.message,'danger'); }
 });
 
-// =====================
-// Filtros y exportaciones
-// =====================
 document.getElementById('btn-aplicar').addEventListener('click', renderAll);
 document.getElementById('btn-limpiar').addEventListener('click', ()=>{
   document.getElementById('f-partida').value='';
@@ -258,9 +293,6 @@ function exportMissingCsv(){
 document.getElementById('btn-export-missing').addEventListener('click', exportMissingCsv);
 document.getElementById('btn-export-missing-footer').addEventListener('click', exportMissingCsv);
 
-// =====================
-// Demo / Import / Export / Reset
-// =====================
 document.getElementById('btn-demo').addEventListener('click', ()=>{
   STATE.presupuesto = [
     { partida:'5151', presupuesto: 20000000 },
@@ -315,11 +347,14 @@ document.getElementById('btn-reset').addEventListener('click', ()=>{
   banner('Datos reiniciados.','warning');
 });
 
-// =====================
-// Init
-// =====================
-window.addEventListener('DOMContentLoaded', ()=>{
-  const ok = loadLS();
-  if (ok) banner('Datos cargados desde tu navegador.','info');
-  renderAll();
+window.addEventListener('DOMContentLoaded', async ()=>{
+  try{
+    await loadFromAPI();
+    renderAll();
+    banner('Datos cargados desde PostgreSQL.','info');
+  }catch(e){
+    banner('No se pudo conectar al backend. Revisa que el servidor esté corriendo.','danger');
+    renderAll(); // al menos pinta la UI
+  }
 });
+

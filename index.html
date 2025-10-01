@@ -138,28 +138,37 @@
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-body">
-            <h6 class="mb-3">Reconducciones</h6>
-            <form id="form-recon" class="row g-2">
-              <div class="col-7">
-                <label class="form-label">Concepto</label>
-                <input type="text" class="form-control" id="r-concepto" placeholder="Conmutador">
-              </div>
-              <div class="col-5">
-                <label class="form-label">Partida</label>
-                <input type="text" class="form-control" id="r-partida" placeholder="3171">
-              </div>
-              <div class="col-12">
-                <label class="form-label">Monto</label>
-                <input type="number" step="0.01" class="form-control" id="r-monto" placeholder="500000">
-              </div>
-              <div class="col-12 d-grid">
-                <button class="btn btn-success" type="submit"><i class="bi bi-plus-circle me-1"></i>Agregar</button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <!-- Reconducciones -->
+<div class="card"><div class="card-body">
+  <h6 class="mb-3">Reconducciones</h6>
+  <form id="form-recon" class="row g-2">
+    <div class="col-12">
+      <label class="form-label">Concepto (opcional)</label>
+      <input type="text" class="form-control" id="r-concepto" placeholder="Ej. Conmutador / UPS">
+    </div>
+    <div class="col-6">
+      <label class="form-label">De partida (origen)</label>
+      <input type="text" class="form-control" id="r-origen" placeholder="Partida" required>
+    </div>
+    <div class="col-6">
+      <label class="form-label">A partida (destino)</label>
+      <input type="text" class="form-control" id="r-destino" placeholder="Partida" required>
+    </div>
+    <div class="col-12">
+      <label class="form-label">Monto a mover</label>
+      <input type="number" step="0.01" class="form-control" id="r-monto" placeholder="Monto" required>
+    </div>
+    <div class="col-12 d-grid">
+      <button class="btn btn-success" type="submit">
+        <i class="bi bi-arrow-left-right me-1"></i> Aplicar reconducción
+      </button>
+    </div>
+  </form>
+  <small class="text-muted-2 d-block mt-2">
+    Si el destino no existe se crea automáticamente. Si el origen queda negativo se mostrará alerta y se marcará en rojo.
+  </small>
+</div></div>
+
       </div>
 
       <!-- Panel derecho: Tablas y gráfico -->
