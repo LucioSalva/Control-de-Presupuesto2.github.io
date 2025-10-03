@@ -74,3 +74,13 @@ body * {
 .table td:first-child::before {
   content: attr(data-pill);
 }
+/* ===== Alertas legibles ===== */
+.alert {
+  color: rgba(0, 0, 0, 0.9) !important;
+  font-weight: 600;
+}
+.alert a,
+.alert strong {
+  color: inherit !important;
+}
+
