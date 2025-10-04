@@ -26,8 +26,13 @@
       </a>
 
       <div class="ms-auto d-flex gap-2 align-items-center">
-        <!-- ID de proyecto (numérico si tu backend usa idProyecto BIGINT) -->
-        <input id="proj-code" class="form-control form-control-sm" placeholder="ID de proyecto" style="width: 260px;">
+        <!-- Buscar proyecto/partida -->
+        <form id="nav-search" class="nav-search" autocomplete="off">
+          <button type="submit" class="nav-search__btn" aria-label="Buscar ID">
+            <i class="bi bi-search"></i>
+          </button>
+          <input id="proj-code" class="form-control form-control-sm nav-search__input" placeholder="ID presupuesto o partida">
+        </form>
 
         <!-- Exportar Excel -->
         <button id="btn-export-xlsx" class="btn btn-outline-light btn-sm">
@@ -339,3 +344,4 @@
 </body>
 
 </html>
+

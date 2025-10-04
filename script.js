@@ -1,10 +1,11 @@
-ï»¿// ===== utilidades =====
+// ===== utilidades =====
 const money = (v) => {
-  if (v === undefined || v === null || isNaN(v)) return 'â€”';
+  if (v === undefined || v === null || isNaN(v)) return '—';
   return v.toLocaleString('es-MX', { style:'currency', currency:'MXN', maximumFractionDigits:2 });
 };
 const MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const LS_KEY = 'cp_app_data_v1';
+const normalizeKey = (value) => String(value || '').trim().toLowerCase();
 
 const STATE = {
   // presupuesto: [{ partida, presupuesto, saldo, gastado, recon, fechaGasto, fechaRecon }]
@@ -15,6 +16,8 @@ const STATE = {
   recon: [],
   partitdasCatalog: new Set(),
   chart: null,
+  highlightPartida: null,
+  highlightNeedsScroll: false,
   missingRows: []
 };
 
@@ -53,41 +56,43 @@ async function apiDelete(path){
   return d;
 }
 
-// ===== Cargar desde BD (tabla Ãºnica) =====
+// ===== Cargar desde BD (tabla única) =====
 async function loadFromAPI(){
   const project = (document.getElementById('proj-code').value || '').trim();
   if (!project) {
     STATE.presupuesto = [];
     STATE.gastos = [];
     STATE.recon = [];
+    STATE.highlightPartida = null;
+    STATE.highlightNeedsScroll = false;
     return;
   }
   const qs = '?project=' + encodeURIComponent(project);
   const detalles = await apiGet('/api/detalles' + qs);
 
-  // Partidas (tabla principal y grÃ¡ficos)
+  // Partidas (tabla principal y gráficos)
   STATE.presupuesto = detalles.map(d => ({
     partida: d.partida,
     presupuesto: Number(d.presupuesto || 0),
     saldo: Number(d.saldo_disponible || 0),
     gastado: Number(d.total_gastado || 0),
     recon: Number(d.total_reconducido || 0),
-    // para el grÃ¡fico mensual (aprox por Ãºltima fecha conocida)
+    // para el gráfico mensual (aprox por última fecha conocida)
     fechaGasto: d.fecha_cuando_se_gasto ? new Date(d.fecha_cuando_se_gasto) : null,
     fechaRecon: d.fecha_reconduccion ? new Date(d.fecha_reconduccion) : null
   }));
 
-  // Gastos (a partir de los acumulados y la Ãºltima fecha/desc si existe)
+  // Gastos (a partir de los acumulados y la última fecha/desc si existe)
   STATE.gastos = detalles
     .filter(d => Number(d.total_gastado) > 0)
     .map(d => ({
       fecha: d.fecha_cuando_se_gasto ? new Date(d.fecha_cuando_se_gasto) : null,
-      descripcion: d.en_que_se_gasto || '(sin descripciÃ³n)',
+      descripcion: d.en_que_se_gasto || '(sin descripción)',
       partida: d.partida,
       monto: Number(d.total_gastado || 0)
     }));
 
-  // Reconducciones (solo totales por partida y Ãºltima fecha/concepto)
+  // Reconducciones (solo totales por partida y última fecha/concepto)
   STATE.recon = detalles
     .filter(d => (d.fecha_reconduccion || Number(d.total_reconducido)))
     .map(d => ({
@@ -115,7 +120,11 @@ function renderAll(){
     const saldo = (typeof p.saldo === 'number') ? p.saldo : (p.presupuesto - gastado);
     sumPres += p.presupuesto; sumGast += gastado; sumSaldo += saldo;
     const tr = document.createElement('tr');
+    tr.dataset.partida = p.partida;
     if (saldo < 0) tr.classList.add('table-danger');
+    if (STATE.highlightPartida && normalizeKey(p.partida) === STATE.highlightPartida) {
+      tr.classList.add('search-hit');
+    }
     tr.innerHTML = `
       <td class="fw-semibold">${p.partida}</td>
       <td class="text-end">${money(p.presupuesto)}</td>
@@ -124,6 +133,14 @@ function renderAll(){
     `;
     tbody.appendChild(tr);
   });
+
+  if (STATE.highlightNeedsScroll) {
+    const targetRow = tbody.querySelector('tr.search-hit');
+    if (targetRow) {
+      targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    STATE.highlightNeedsScroll = false;
+  }
 
   // Totales
   const trTot = document.createElement('tr');
@@ -144,14 +161,14 @@ function renderAll(){
   document.getElementById('kpi-saldo').textContent = money(saldoTotal);
   document.getElementById('kpi-porc').textContent = porc.toFixed(2)+'%';
 
-  // Missing partidas (gastos sin partida vÃ¡lida)
+  // Missing partidas (gastos sin partida válida)
   const missing = STATE.gastos.filter(g => !g.partida || !STATE.partitdasCatalog.has(g.partida));
   STATE.missingRows = missing;
   document.getElementById('missing-count').textContent = missing.length;
   document.getElementById('missing-alert').style.display = missing.length ? 'block' : 'none';
   renderMissing(missing);
 
-  // GrÃ¡fica (nueva)
+  // Gráfica (nueva)
   renderChart();
 
   // Movimientos
@@ -159,6 +176,26 @@ function renderAll(){
 
   // Persistencia local (opcional)
   saveLS();
+}
+
+function showPartidaDetails(partidaTerm){
+  const key = normalizeKey(partidaTerm);
+  if (!key) return false;
+  const row = STATE.presupuesto.find(p => normalizeKey(p.partida) === key);
+  if (!row) return false;
+  const gastado = typeof row.gastado === 'number' ? row.gastado : 0;
+  const saldo = (typeof row.saldo === 'number') ? row.saldo : (row.presupuesto - gastado);
+  const html = `
+    <div class="d-flex flex-column gap-1 small">
+      <div><strong>Partida ${escapeHtml(row.partida)}</strong></div>
+      <div>Presupuesto: <strong>${money(row.presupuesto)}</strong></div>
+      <div>Gastado: <strong>${money(gastado)}</strong></div>
+      <div>Saldo: <strong>${money(saldo)}</strong></div>
+      <div>Reconducción: <strong>${money(row.recon)}</strong></div>
+    </div>
+  `;
+  banner(html, 'info');
+  return true;
 }
 
 function getFiltros(){
@@ -182,8 +219,9 @@ function renderMissing(rows){
   const tbody = document.querySelector('#tabla-missing tbody');
   tbody.innerHTML = '';
   rows.forEach(r => {
-    const d = r.fecha ? `${String(r.fecha.getUTCDate()).padStart(2,'0')}/${MES[r.fecha.getUTCMonth()]}/${r.fecha.getUTCFullYear()}` : 'â€”';
+    const d = r.fecha ? `${String(r.fecha.getUTCDate()).padStart(2,'0')}/${MES[r.fecha.getUTCMonth()]}/${r.fecha.getUTCFullYear()}` : '—';
     const tr = document.createElement('tr');
+    tr.dataset.partida = p.partida;
     tr.innerHTML = `<td>${d}</td><td>${escapeHtml(r.descripcion||'')}</td><td class="text-end">${money(r.monto)}</td>`;
     tbody.appendChild(tr);
   });
@@ -197,6 +235,7 @@ function renderMovimientos(){
   const movs = buildMovimientos();
   movs.forEach(m => {
     const tr = document.createElement('tr');
+    tr.dataset.partida = p.partida;
     tr.innerHTML = `
       <td class="fw-semibold">${m.tipo}</td>
       <td>${escapeHtml(m.concepto)}</td>
@@ -208,7 +247,7 @@ function renderMovimientos(){
   });
 }
 
-/* ================== NUEVO: datasets para la grÃ¡fica ================== */
+/* ================== NUEVO: datasets para la gráfica ================== */
 function buildChartData(group){
   // helper de dataset
   const ds = (label, data) => ({ label, data, borderWidth: 1, backgroundColor: undefined });
@@ -247,9 +286,9 @@ function buildChartData(group){
     };
   }
 
-  // group === 'mes'  (aproximaciÃ³n: usa Ãºltima fecha conocida por partida)
+  // group === 'mes'  (aproximación: usa última fecha conocida por partida)
   const byMonth = {
-    pres: new Array(12).fill(0),   // opcional: lÃ­nea constante de presupuesto anual
+    pres: new Array(12).fill(0),   // opcional: línea constante de presupuesto anual
     gast: new Array(12).fill(0),
     reco: new Array(12).fill(0),
   };
@@ -277,7 +316,7 @@ function buildChartData(group){
   };
 }
 
-/* ================== NUEVO: render de la grÃ¡fica ================== */
+/* ================== NUEVO: render de la gráfica ================== */
 function renderChart(){
   const group = (document.getElementById('chart-group')?.value || 'mes');
   const stacked = !!document.getElementById('chart-stacked')?.checked;
@@ -309,8 +348,8 @@ function buildMovimientos(){
   // Reconducciones (solo vista agregada por partida destino)
   STATE.recon.forEach(r => {
     movs.push({
-      tipo: 'ReconducciÃ³n',
-      concepto: r.concepto || 'â€”',
+      tipo: 'Reconducción',
+      concepto: r.concepto || '—',
       origen: r.origen || '',
       destino: r.destino || '',
       monto: Number(r.monto) || 0,
@@ -322,7 +361,7 @@ function buildMovimientos(){
     const ts = g.fecha instanceof Date ? g.fecha.getTime() : 0;
     movs.push({
       tipo: 'Gasto',
-      concepto: g.descripcion || 'â€”',
+      concepto: g.descripcion || '—',
       origen: '',
       destino: g.partida && g.partida.trim() ? g.partida.trim() : '(sin partida)',
       monto: Number(g.monto) || 0,
@@ -340,7 +379,7 @@ document.getElementById('form-partida').addEventListener('submit', async (ev)=>{
   const presupuesto = parseFloat(document.getElementById('p-monto').value);
   const project = (document.getElementById('proj-code').value || '').trim();
   if (!project) return banner('Captura el ID de proyecto antes de registrar','warning');
-  if (!clave || isNaN(presupuesto)) return banner('Captura partida y presupuesto vÃ¡lidos','warning');
+  if (!clave || isNaN(presupuesto)) return banner('Captura partida y presupuesto válidos','warning');
   try{
     await apiPost('/api/detalles', { project, partida: clave, presupuesto });
     await loadFromAPI(); renderAll();
@@ -357,7 +396,7 @@ document.getElementById('form-gasto').addEventListener('submit', async (ev)=>{
   const monto = parseFloat(document.getElementById('g-monto').value);
   const project = (document.getElementById('proj-code').value || '').trim();
   if (!project) return banner('Captura el ID de proyecto antes de registrar','warning');
-  if (!partida || !descripcion || isNaN(monto) || monto <= 0) return banner('Completa partida, descripciÃ³n y monto vÃ¡lido','warning');
+  if (!partida || !descripcion || isNaN(monto) || monto <= 0) return banner('Completa partida, descripción y monto válido','warning');
   try{
     await apiPost('/api/gastos', { project, partida, fecha, descripcion, monto });
     await loadFromAPI(); renderAll();
@@ -374,15 +413,64 @@ document.getElementById('form-recon').addEventListener('submit', async (ev)=>{
   const monto = parseFloat(document.getElementById('r-monto').value);
   const project = (document.getElementById('proj-code').value || '').trim();
   if (!project) return banner('Captura el ID de proyecto antes de registrar','warning');
-  if (!origen || !destino || isNaN(monto) || monto <= 0) return banner('Completa origen, destino y monto vÃ¡lido','warning');
+  if (!origen || !destino || isNaN(monto) || monto <= 0) return banner('Completa origen, destino y monto válido','warning');
   try{
     const r = await apiPost('/api/reconducir', { project, origen, destino, monto, concepto, fecha: new Date().toISOString().slice(0,10) });
-    if (r.origenNegativo) banner(`La partida ${origen} quedÃ³ en negativo (saldo: ${money(r.saldos.origen)})`, 'danger');
+    if (r.origenNegativo) banner(`La partida ${origen} quedó en negativo (saldo: ${money(r.saldos.origen)})`, 'danger');
     await loadFromAPI(); renderAll();
-    banner('ReconducciÃ³n aplicada','success');
+    banner('Reconducción aplicada','success');
     ev.target.reset();
   }catch(e){ banner(e.message,'danger'); }
 });
+
+const navSearchForm = document.getElementById('nav-search');
+if (navSearchForm) {
+  navSearchForm.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    const input = document.getElementById('proj-code');
+    const rawValue = (input?.value || '').trim();
+    if (!rawValue) {
+      input?.focus();
+      return;
+    }
+    showSpinner(true);
+    try {
+      await loadFromAPI();
+      const key = normalizeKey(rawValue);
+      const foundPartida = STATE.presupuesto.some(p => normalizeKey(p.partida) === key);
+      STATE.highlightPartida = foundPartida ? key : null;
+      STATE.highlightNeedsScroll = foundPartida;
+      renderAll();
+      if (!STATE.presupuesto.length) {
+        banner(`No se encontraron registros para <strong>${escapeHtml(rawValue)}</strong>.`, 'warning');
+        return;
+      }
+      if (foundPartida) {
+        showPartidaDetails(rawValue);
+        return;
+      }
+      const totalPresupuesto = STATE.presupuesto.reduce((acc, row) => acc + (row.presupuesto || 0), 0);
+      const totalGastado = STATE.presupuesto.reduce((acc, row) => acc + (row.gastado || 0), 0);
+      const totalSaldo = STATE.presupuesto.reduce((acc, row) => acc + (typeof row.saldo === 'number' ? row.saldo : (row.presupuesto - (row.gastado || 0))), 0);
+      const totalRecon = STATE.presupuesto.reduce((acc, row) => acc + (row.recon || 0), 0);
+      const resumen = `
+        <div class="d-flex flex-column gap-1 small">
+          <div><strong>ID ${escapeHtml(rawValue)}</strong></div>
+          <div>Partidas registradas: <strong>${STATE.presupuesto.length}</strong></div>
+          <div>Presupuesto total: <strong>${money(totalPresupuesto)}</strong></div>
+          <div>Gastado: <strong>${money(totalGastado)}</strong></div>
+          <div>Saldo: <strong>${money(totalSaldo)}</strong></div>
+          <div>Reconducción: <strong>${money(totalRecon)}</strong></div>
+        </div>
+      `;
+      banner(resumen, 'info');
+    } catch (err) {
+      banner(`No se pudo recuperar la información (${escapeHtml(err.message)})`, 'danger');
+    } finally {
+      showSpinner(false);
+    }
+  });
+}
 
 // Filtros
 document.getElementById('btn-aplicar').addEventListener('click', renderAll);
@@ -392,11 +480,13 @@ function clearUIOnly(){
   STATE.presupuesto = [];
   STATE.gastos = [];
   STATE.recon = [];
+  STATE.highlightPartida = null;
+  STATE.highlightNeedsScroll = false;
   try { localStorage.removeItem(LS_KEY); } catch {}
   renderAll();
 }
 document.getElementById('btn-reset').addEventListener('click', ()=>{
-  const ok = confirm('Â¿Limpiar la vista para capturar un nuevo ID de proyecto?\n(No se borrarÃ¡ nada de la base de datos)');
+  const ok = confirm('¿Limpiar la vista para capturar un nuevo ID de proyecto?\n(No se borrará nada de la base de datos)');
   if (!ok) return;
   const codeInput = document.getElementById('proj-code');
   if (codeInput) codeInput.value = '';
@@ -411,7 +501,7 @@ document.getElementById('btn-ver-missing').addEventListener('click', ()=>{
 });
 function exportMissingCsv(){
   const rows = STATE.missingRows || [];
-  const headers = ['Fecha','DescripciÃ³n','Monto'];
+  const headers = ['Fecha','Descripción','Monto'];
   const data = rows.map(r => [
     r.fecha ? `${r.fecha.getUTCFullYear()}-${String(r.fecha.getUTCMonth()+1).padStart(2,'0')}-${String(r.fecha.getUTCDate()).padStart(2,'0')}` : '',
     (r.descripcion||'').replace(/\r?\n/g,' ').replace(/"/g,'""'),
@@ -478,7 +568,7 @@ window.addEventListener('DOMContentLoaded', async ()=>{
   const project = (document.getElementById('proj-code').value || '').trim();
   if (project) {
     try { await loadFromAPI(); banner('Datos cargados desde PostgreSQL.','info'); }
-    catch(e){ banner('No se pudo conectar al backend. Revisa que el servidor estÃ© corriendo.','danger'); }
+    catch(e){ banner('No se pudo conectar al backend. Revisa que el servidor esté corriendo.','danger'); }
   } else {
     STATE.presupuesto = []; STATE.gastos = []; STATE.recon = [];
   }
@@ -502,6 +592,8 @@ function saveLS(){
   localStorage.setItem(LS_KEY, JSON.stringify(data));
 }
 
-/* ===== Listeners para la grÃ¡fica ===== */
+/* ===== Listeners para la gráfica ===== */
 document.getElementById('chart-group')?.addEventListener('change', renderChart);
 document.getElementById('chart-stacked')?.addEventListener('change', renderChart);
+
+
