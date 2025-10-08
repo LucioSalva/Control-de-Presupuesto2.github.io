@@ -13,8 +13,14 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
 
 // saldo = presupuesto - total_gastado + total_reconducido
-function computeSaldo({ presupuesto = 0, total_gastado = 0, total_reconducido = 0 }) {
-  return Number(presupuesto) - Number(total_gastado) + Number(total_reconducido);
+function computeSaldo({
+  presupuesto = 0,
+  total_gastado = 0,
+  total_reconducido = 0,
+}) {
+  return (
+    Number(presupuesto) - Number(total_gastado) + Number(total_reconducido)
+  );
 }
 
 // Salud
@@ -50,9 +56,12 @@ app.post("/api/detalles", async (req, res) => {
     const partida = String(req.body.partida || "").trim();
     const presupuesto = Number(req.body.presupuesto);
 
-    if (!project) return res.status(400).json({ error: "project es obligatorio" });
+    if (!project)
+      return res.status(400).json({ error: "project es obligatorio" });
     if (!partida || isNaN(presupuesto))
-      return res.status(400).json({ error: "partida y presupuesto válidos requeridos" });
+      return res
+        .status(400)
+        .json({ error: "partida y presupuesto válidos requeridos" });
 
     // Verificar si ya existe fila para recuperar totales
     const sel = await query(
@@ -62,7 +71,8 @@ app.post("/api/detalles", async (req, res) => {
       [project, partida]
     );
 
-    let total_gastado = 0, total_reconducido = 0;
+    let total_gastado = 0,
+      total_reconducido = 0;
     if (sel.rows.length) {
       total_gastado = Number(sel.rows[0].total_gastado || 0);
       total_reconducido = Number(sel.rows[0].total_reconducido || 0);
@@ -97,7 +107,8 @@ app.post("/api/gastos", async (req, res) => {
     const fecha = req.body.fecha || null;
     const descripcion = req.body.descripcion || null;
 
-    if (!project) return res.status(400).json({ error: "project es obligatorio" });
+    if (!project)
+      return res.status(400).json({ error: "project es obligatorio" });
     if (!partida || isNaN(monto) || monto <= 0)
       return res.status(400).json({ error: "partida y monto > 0 requeridos" });
 
@@ -124,7 +135,11 @@ app.post("/api/gastos", async (req, res) => {
         [monto, fecha, descripcion, project, partida]
       );
 
-      const row = upd.rows[0] || { presupuesto: 0, total_gastado: 0, total_reconducido: 0 };
+      const row = upd.rows[0] || {
+        presupuesto: 0,
+        total_gastado: 0,
+        total_reconducido: 0,
+      };
       const saldo = computeSaldo(row);
 
       const updSaldo = await client.query(
@@ -161,9 +176,12 @@ app.post("/api/reconducir", async (req, res) => {
     const concepto = req.body.concepto || null;
     const fecha = req.body.fecha || null;
 
-    if (!project) return res.status(400).json({ error: "project es obligatorio" });
+    if (!project)
+      return res.status(400).json({ error: "project es obligatorio" });
     if (!origen || !destino || isNaN(monto) || monto <= 0)
-      return res.status(400).json({ error: "origen, destino y monto > 0 requeridos" });
+      return res
+        .status(400)
+        .json({ error: "origen, destino y monto > 0 requeridos" });
 
     const client = await getClient();
     try {
@@ -225,7 +243,7 @@ app.post("/api/reconducir", async (req, res) => {
       res.json({
         ok: true,
         origenNegativo: saldoOrigen < 0,
-        saldos: { origen: saldoOrigen, destino: saldoDestino }
+        saldos: { origen: saldoOrigen, destino: saldoDestino },
       });
     } catch (txErr) {
       await client.query("ROLLBACK");
@@ -245,8 +263,12 @@ app.post("/api/reconducir", async (req, res) => {
 app.delete("/api/project", async (req, res) => {
   try {
     const project = String(req.query.project || "").trim();
-    if (!project) return res.status(400).json({ error: "project es obligatorio" });
-    const r = await query("DELETE FROM presupuesto_detalle WHERE idProyecto = $1", [project]);
+    if (!project)
+      return res.status(400).json({ error: "project es obligatorio" });
+    const r = await query(
+      "DELETE FROM presupuesto_detalle WHERE idProyecto = $1",
+      [project]
+    );
     res.json({ ok: true, deleted_rows: r.rowCount });
   } catch (e) {
     console.error("DELETE /api/project", e);
