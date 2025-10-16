@@ -1,5 +1,6 @@
 ﻿// server.js (project alfanumérico)
 import express from "express";
+import pg from 'pg';
 import cors from "cors";
 import dotenv from "dotenv";
 import { query, getClient } from "./db.js";
@@ -280,4 +281,38 @@ app.delete("/api/project", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("API escuchando en http://localhost:" + PORT);
+});
+
+
+// En tu server.js (backend)
+app.get('/api/check-duplicates', async (req, res) => {
+    try {
+        const { project, partida } = req.query;
+        const result = await pool.query(
+            `SELECT partida, presupuesto, fecha_registro 
+             FROM public.presupuesto_detalle 
+             WHERE idProyecto = $1 AND partida = $2 
+             ORDER BY fecha_registro DESC`,
+            [project, partida]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/check-recon-duplicates', async (req, res) => {
+    try {
+        const { project, origen, destino, monto } = req.query;
+        const result = await pool.query(
+            `SELECT origen, destino, monto, fecha_reconduccion 
+             FROM public.reconducciones 
+             WHERE idProyecto = $1 AND origen = $2 AND destino = $3 AND monto = $4 
+             ORDER BY fecha_reconduccion DESC`,
+            [project, origen, destino, monto]
+        );
+        res.json(result.rows);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });

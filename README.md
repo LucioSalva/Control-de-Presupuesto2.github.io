@@ -1,20 +1,42 @@
-# Control de Presupuesto — App sin Excel (HTML5 + Bootstrap 5 + JS)
-Aplicación **100% en navegador**, sin backend y **sin Excel**. Permite **capturar** Presupuesto/Partidas, **registrar Gastos**, **agregar Reconducciones** y calcula KPIs, tabla por partida, **gasto mensual** y **gastos sin Partida**. Guarda los datos en **localStorage**.
+# 💼 CONTROL PRESUPUESTO WEB 3
+### Sistema para la Gestión, Control y Seguimiento del Presupuesto Municipal
 
-## Archivos
-- `index.html` — UI completa con formularios, tablas y gráfica.
-- `styles.css` — Tema oscuro con fuentes blancas.
-- `script.js` — Lógica: estado, persistencia, cálculos, render, import/export JSON.
+---
 
-## Funciones clave
-- **Captura**: Partidas/Presupuesto, Gastos (con/sin partida), Reconducciones.
-- **Cálculo**: Gastado por partida, KPIs, saldo, gráfico mensual.
-- **Alertas**: Gastos sin partida (modal + exportar CSV).
-- **Persistencia**: `localStorage` (botones *Exportar JSON*, *Importar JSON* y *Reiniciar*).
-- **Demo**: carga datos de ejemplo.
+## 🏛️ Contexto Institucional
 
-## Uso
-1. Abre `index.html` en tu navegador.
-2. Agrega partidas en “Partidas / Presupuesto”.
-3. Registra gastos y reconducciones.
-4. Usa los filtros y exporta CSV/JSON si lo necesitas.
+**CONTROL PRESUPUESTO WEB 3** es un sistema desarrollado por la  
+**Subdirección de Tecnologías de la Información y la Comunicación (TIC’s)**  
+del **H. Ayuntamiento de Ecatepec de Morelos**, con el objetivo de **optimizar la administración presupuestal** de los recursos municipales mediante herramientas digitales modernas, transparentes y accesibles desde la web.
+
+El sistema automatiza procesos relacionados con la planeación, asignación y ejecución del gasto público, eliminando la dependencia de hojas de cálculo manuales y promoviendo la eficiencia administrativa.
+
+---
+
+## 🚀 Objetivo del Sistema
+
+Proveer una plataforma unificada para el **registro, consulta, análisis y control del presupuesto municipal**, permitiendo a las áreas responsables:
+- Registrar **partidas presupuestales** y sus montos iniciales.  
+- Capturar **gastos y reconducciones** en tiempo real.  
+- Consultar indicadores gráficos de **ejercicio del presupuesto**.  
+- Exportar información en formatos **Excel (.xlsx)** y **CSV**.  
+- Prevenir errores y saldos negativos mediante **alertas inteligentes**.
+
+---
+
+## 🧩 Características Principales
+-----------------------------------------------------------------------------------------------------------
+| Módulo                          | Descripción                                                           |
+|-------------------------------- |-----------------------------------------------------------------------|
+| 📊 **Dashboard de Control**    | Visualiza totales de presupuesto, gasto, saldo y reconducción.         |
+| 💸 **Gestión de Partidas**     | Alta, edición y seguimiento de partidas presupuestales por proyecto.   |
+| 🧾 **Registro de Gastos**      | Control detallado de cada egreso con fecha, concepto y partida.        |
+| 🔁 **Reconducciones**          | Movimientos entre partidas origen y destino en una sola operación.     |
+| 📈 **Gráficos Interactivos**   | Generados con *Chart.js* para análisis mensual o por partida.          |
+| ⚠️ **Alertas y Validaciones**  | Notificaciones visuales en caso de saldo negativo o datos incompletos. |
+| 💾 **Exportación Inteligente** | Exporta todo el presupuesto, gastos y reconducciones a Excel o CSV.    |
+-----------------------------------------------------------------------------------------------------------
+---
+
+## 🧱 Arquitectura del Proyecto
+

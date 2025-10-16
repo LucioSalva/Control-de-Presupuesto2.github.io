@@ -1,3 +1,8 @@
+:root {
+  --letras: #ffffff;
+}
+
+/* Fondo claro general y tipografía blanca por defecto (como pediste) */
 body {
   background: #fdfdfd;
   color: #ffffff;
@@ -6,35 +11,28 @@ body,
 body * {
   color: #ffffff !important;
 }
+
+/* Navbar guinda */
 .navbar {
-  background: linear-gradient(90deg, #691c32, #bc955c);
+  background: #691c32;
 }
+
+/* ===== Cards con TRANSPARENCIA =====
+   Ajusta el 0.35 para más/menos claridad (0.25 más claro, 0.5 más oscuro) */
 .card {
-  background: #0f1720;
-  border: 1px solid #1f354d;
+  background: rgba(0, 0, 0, 0.85); /* <-- transparencia */
+  border: 2px solid #ffffff;
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 }
+
+/* Tablas */
 .table thead th {
   border-bottom-color: #1f354d;
 }
 .table tbody tr:hover {
   background: rgba(255, 255, 255, 0.03);
-}
-.text-muted-2 {
-  color: #cfd9e3 !important;
-}
-.form-control,
-.form-select {
-  background: #0f1720 !important;
-  color: #ffffff !important;
-  border: 1px solid #1f354d;
-}
-.form-control::placeholder {
-  color: #cccccc !important;
-}
-.alert-soft {
-  background: #0f1720;
-  color: #ffffff;
-  border: 1px dashed #2b4b6a;
 }
 .table {
   color: #ffffff;
@@ -42,6 +40,24 @@ body * {
 .table td,
 .table th {
   border-color: #1f354d !important;
+}
+
+/* Inputs y selects */
+.form-control,
+.form-select {
+  background: #0f1720 !important;
+  color: #ffffff !important;
+  border: 1px solid #1f354d;
+}
+.form-control::placeholder {
+  color: #ffffff !important;
+}
+
+/* Alertas y modales */
+.alert-soft {
+  background: #0f1720;
+  color: #ffffff;
+  border: 1px dashed #2b4b6a;
 }
 .spinner {
   display: none;
@@ -51,17 +67,19 @@ body * {
   border: 1px solid #1f354d;
   color: #ffffff;
 }
+
+/* KPI */
 .kpi-title {
   opacity: 0.9;
   font-size: 0.9rem;
 }
 
+/* Si quieres celdas de tabla en blanco con letra negra */
 .table thead th,
 .table tbody td {
   color: #000000 !important;
-  background-color: #ffffff !important; /* si quieres fondo blanco en celdas */
+  background-color: #ffffff !important;
 }
-
 .table thead th {
   font-weight: bold;
 }
@@ -72,7 +90,8 @@ body * {
 .table td:first-child::before {
   content: attr(data-pill);
 }
-/* ===== Alertas legibles ===== */
+
+/* Alertas legibles */
 .alert {
   color: rgba(65, 65, 65, 0.9) !important;
   font-weight: 600;
@@ -82,7 +101,7 @@ body * {
   color: inherit !important;
 }
 
-/* Barra de b�squeda en navbar */
+/* Barra de búsqueda en navbar */
 .nav-search {
   position: relative;
   display: flex;
@@ -143,6 +162,7 @@ body * {
   color: rgba(255, 255, 255, 0.7) !important;
 }
 
+/* Resaltado de búsqueda en tablas */
 .table tr.search-hit > td {
   background: rgba(188, 149, 92, 0.25) !important;
   transition: background 0.35s ease;

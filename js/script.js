@@ -1,18 +1,15 @@
 ﻿// ===== utilidades =====
 const money = (v) => {
-  if (v === undefined || v === null || isNaN(v)) return '�';
-  return v.toLocaleString('es-MX', { style:'currency', currency:'MXN', maximumFractionDigits:2 });
+  if (v === undefined || v === null || isNaN(v)) return '—';
+  return Number(v).toLocaleString('es-MX', { style:'currency', currency:'MXN', maximumFractionDigits:2 });
 };
 const MES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 const LS_KEY = 'cp_app_data_v1';
 const normalizeKey = (value) => String(value || '').trim().toLowerCase();
 
 const STATE = {
-  // presupuesto: [{ partida, presupuesto, saldo, gastado, recon, fechaGasto, fechaRecon }]
   presupuesto: [],
-  // gastos: [{ fecha: Date|null, descripcion, partida, monto }]
   gastos: [],
-  // recon: [{ concepto, origen, destino, monto }]
   recon: [],
   partitdasCatalog: new Set(),
   chart: null,
@@ -21,21 +18,11 @@ const STATE = {
   missingRows: []
 };
 
-// SweetAlert2 banner replacement
+// SweetAlert2
 function banner(msg, type = 'info') {
-  const iconMap = {
-    'info': 'info',
-    'success': 'success',
-    'warning': 'warning',
-    'danger': 'error'
-  };
-
-  const titleMap = {
-    'info': 'Información',
-    'success': 'Éxito',
-    'warning': 'Advertencia',
-    'danger': 'Error'
-  };
+  const iconMap = { 'info': 'info', 'success': 'success', 'warning': 'warning', 'danger': 'error' };
+  const titleMap = { 'info': 'Información', 'success': 'Éxito', 'warning': 'Advertencia', 'danger': 'Error' };
+  const timerSettings = { 'info': 10000, 'success': 8000, 'warning': 15000, 'danger': 20000 };
 
   Swal.fire({
     icon: iconMap[type] || 'info',
@@ -44,24 +31,19 @@ function banner(msg, type = 'info') {
     toast: true,
     position: 'top-end',
     showConfirmButton: false,
-    timer: 6000,
+    timer: timerSettings[type] || 10000,
     timerProgressBar: true,
     background: '#1a1a1a',
     color: '#ffffff',
-    customClass: {
-      popup: 'sweetalert-toast'
-    }
+    customClass: { popup: 'sweetalert-toast' }
   });
 }
 
-// Función para mostrar alerta de números negativos
 function showNegativeBalanceAlert(partidasNegativas) {
   if (partidasNegativas.length === 0) return;
-
-  const partidasList = partidasNegativas.map(p => 
+  const partidasList = partidasNegativas.map(p =>
     `• <strong>${escapeHtml(p.partida)}</strong>: ${money(p.saldo)}`
   ).join('<br>');
-
   Swal.fire({
     icon: 'warning',
     title: '¡Atención! Números Negativos',
@@ -69,9 +51,7 @@ function showNegativeBalanceAlert(partidasNegativas) {
     confirmButtonText: 'Entendido',
     background: '#1a1a1a',
     color: '#ffffff',
-    customClass: {
-      popup: 'sweetalert-negative-alert'
-    }
+    customClass: { popup: 'sweetalert-negative-alert' }
   });
 }
 
@@ -86,7 +66,6 @@ async function apiGet(path) {
   if (!r.ok) throw new Error('GET ' + path + ' ' + r.status);
   return r.json();
 }
-
 async function apiPost(path, body) {
   const r = await fetch(API_URL + path, {
     method: 'POST',
@@ -97,7 +76,6 @@ async function apiPost(path, body) {
   if (!r.ok || data.error) throw new Error(data.error || ('POST ' + path));
   return data;
 }
-
 async function apiDelete(path) {
   const r = await fetch(API_URL + path, { method: 'DELETE' });
   const d = await r.json().catch(() => ({}));
@@ -105,7 +83,88 @@ async function apiDelete(path) {
   return d;
 }
 
-// ===== Cargar desde BD (tabla única) =====
+/* ================== NORMALIZADOR DE RECONDUCCIONES ================== */
+function mergeReconPairs(reconsRaw) {
+  if (!Array.isArray(reconsRaw) || !reconsRaw.length) return [];
+
+  const toISO = (d) => {
+    if (!(d instanceof Date)) return '';
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const day = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const groups = new Map();
+
+  reconsRaw.forEach(r => {
+    const concepto = (r.concepto || '').trim();
+    const fechaISO = r.fecha instanceof Date ? toISO(r.fecha) : (r.fecha ? String(r.fecha) : '');
+    const montoAbs = Math.abs(Number(r.monto || 0));
+    const key = `${concepto}|${fechaISO}|${montoAbs}`;
+
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({
+      concepto,
+      fecha: r.fecha instanceof Date ? r.fecha : (r.fecha ? new Date(r.fecha) : null),
+      origen: r.origen || '',
+      destino: r.destino || '',
+      monto: Number(r.monto || 0)
+    });
+  });
+
+  const merged = [];
+
+  for (const [, arr] of groups.entries()) {
+    if (arr.length === 1) {
+      const a = arr[0];
+      merged.push({
+        concepto: a.concepto || '',
+        origen: a.origen || '',
+        destino: a.destino || '',
+        monto: Math.abs(a.monto || 0),
+        fecha: a.fecha || null
+      });
+      continue;
+    }
+    let origen = '';
+    let destino = '';
+    let fecha = arr[0].fecha || null;
+    let concepto = arr[0].concepto || '';
+    let monto = Math.abs(arr[0].monto || 0);
+
+    const neg = arr.find(x => x.monto < 0);
+    const pos = arr.find(x => x.monto > 0);
+
+    if (neg && pos) {
+      origen = neg.origen || neg.destino || origen;
+      destino = pos.destino || pos.origen || destino;
+      fecha = neg.fecha || pos.fecha || fecha;
+      monto = Math.max(Math.abs(neg.monto), Math.abs(pos.monto));
+    } else {
+      const withOrigen = arr.find(x => x.origen);
+      const withDestino = arr.find(x => x.destino);
+      if (withOrigen) origen = withOrigen.origen;
+      if (withDestino) destino = withDestino.destino;
+      if (!origen && arr[0]) origen = arr[0].origen || arr[0].destino || '';
+      if (!destino && arr[1]) destino = arr[1].destino || arr[1].origen || '';
+      fecha = (arr.find(x => x.fecha) || {}).fecha || fecha;
+      monto = Math.max(...arr.map(x => Math.abs(Number(x.monto || 0)))) || monto;
+    }
+
+    merged.push({
+      concepto,
+      origen: origen || '',
+      destino: destino || '',
+      monto: Number(monto) || 0,
+      fecha: fecha || null
+    });
+  }
+
+  return merged;
+}
+
+// ===== Cargar desde BD =====
 async function loadFromAPI() {
   const project = (document.getElementById('proj-code').value || '').trim();
   if (!project) {
@@ -119,19 +178,17 @@ async function loadFromAPI() {
   const qs = '?project=' + encodeURIComponent(project);
   const detalles = await apiGet('/api/detalles' + qs);
 
-  // Partidas (tabla principal y gráficos)
   STATE.presupuesto = detalles.map(d => ({
     partida: d.partida,
     presupuesto: Number(d.presupuesto || 0),
     saldo: Number(d.saldo_disponible || 0),
     gastado: Number(d.total_gastado || 0),
     recon: Number(d.total_reconducido || 0),
-    // para el gráfico mensual (aprox por última fecha conocida)
+    fechaRegistro: d.fecha_registro ? new Date(d.fecha_registro) : null,
     fechaGasto: d.fecha_cuando_se_gasto ? new Date(d.fecha_cuando_se_gasto) : null,
     fechaRecon: d.fecha_reconduccion ? new Date(d.fecha_reconduccion) : null
   }));
 
-  // Gastos (a partir de los acumulados y la última fecha/desc si existe)
   STATE.gastos = detalles
     .filter(d => Number(d.total_gastado) > 0)
     .map(d => ({
@@ -141,15 +198,29 @@ async function loadFromAPI() {
       monto: Number(d.total_gastado || 0)
     }));
 
-  // Reconducciones (solo totales por partida y última fecha/concepto)
-  STATE.recon = detalles
-    .filter(d => (d.fecha_reconduccion || Number(d.total_reconducido)))
-    .map(d => ({
-      concepto: d.motivo_reconduccion || '',
-      origen: '(ver movimiento agregado)', // no hay rastro de origen por evento, solo total por partida
-      destino: d.partida,
-      monto: Number(d.total_reconducido || 0)
+  try {
+    const reconducciones = await apiGet('/api/reconducciones' + qs);
+    const raw = reconducciones.map(r => ({
+      concepto: r.concepto || '',
+      origen: r.origen || '',
+      destino: r.destino || '',
+      monto: Number(r.monto || 0),
+      fecha: r.fecha ? new Date(r.fecha) : null
     }));
+    STATE.recon = mergeReconPairs(raw);
+  } catch (e) {
+    console.warn('No se pudieron cargar reconducciones:', e.message);
+    const raw = detalles
+      .filter(d => (d.fecha_reconduccion || Number(d.total_reconducido)))
+      .map(d => ({
+        concepto: d.motivo_reconduccion || '',
+        origen: d.partida_origen || '',
+        destino: d.partida || '',
+        monto: Number(d.total_reconducido || 0),
+        fecha: d.fecha_reconduccion ? new Date(d.fecha_reconduccion) : null
+      }));
+    STATE.recon = mergeReconPairs(raw);
+  }
 }
 
 // ===== Render principal =====
@@ -158,34 +229,22 @@ function renderAll() {
   const filtros = getFiltros();
   const porPartida = groupGastadoPorPartida(STATE.gastos, filtros);
 
-  // Tabla Presupuesto
   const tbody = document.querySelector('#tabla-presupuesto tbody');
   tbody.innerHTML = '';
   let sumPres = 0, sumGast = 0, sumSaldo = 0;
   const presFiltrado = STATE.presupuesto.filter(p => !filtros.partida || p.partida.includes(filtros.partida));
 
-  // Detectar partidas con saldo negativo
   const partidasNegativas = [];
-
   presFiltrado.forEach(p => {
     const gastado = porPartida[p.partida] || 0;
     const saldo = (typeof p.saldo === 'number') ? p.saldo : (p.presupuesto - gastado);
     sumPres += p.presupuesto; sumGast += gastado; sumSaldo += saldo;
-    
-    // Agregar a partidas negativas si el saldo es menor que 0
-    if (saldo < 0) {
-      partidasNegativas.push({
-        partida: p.partida,
-        saldo: saldo
-      });
-    }
-    
+    if (saldo < 0) partidasNegativas.push({ partida: p.partida, saldo });
+
     const tr = document.createElement('tr');
     tr.dataset.partida = p.partida;
     if (saldo < 0) tr.classList.add('table-danger');
-    if (STATE.highlightPartida && normalizeKey(p.partida) === STATE.highlightPartida) {
-      tr.classList.add('search-hit');
-    }
+    if (STATE.highlightPartida && normalizeKey(p.partida) === STATE.highlightPartida) tr.classList.add('search-hit');
     tr.innerHTML = `
       <td class="fw-semibold">${p.partida}</td>
       <td class="text-end">${money(p.presupuesto)}</td>
@@ -195,22 +254,16 @@ function renderAll() {
     tbody.appendChild(tr);
   });
 
-  // Mostrar alerta de números negativos si existen
   if (partidasNegativas.length > 0) {
-    setTimeout(() => {
-      showNegativeBalanceAlert(partidasNegativas);
-    }, 1000);
+    setTimeout(() => { showNegativeBalanceAlert(partidasNegativas); }, 600);
   }
 
   if (STATE.highlightNeedsScroll) {
     const targetRow = tbody.querySelector('tr.search-hit');
-    if (targetRow) {
-      targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    if (targetRow) targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
     STATE.highlightNeedsScroll = false;
   }
 
-  // Totales
   const trTot = document.createElement('tr');
   trTot.innerHTML = `
     <td class="fw-bold">TOTAL</td>
@@ -219,30 +272,24 @@ function renderAll() {
     <td class="text-end fw-bold ${sumSaldo < 0 ? 'text-danger' : ''}">${money(sumSaldo)}</td>`;
   tbody.appendChild(trTot);
 
-  // KPIs
   const presupuestoTotal = STATE.presupuesto.reduce((a, b) => a + (b.presupuesto || 0), 0);
   const gastadoTotal = STATE.gastos.reduce((a, b) => a + (b.monto || 0), 0);
-  const saldoTotal = STATE.presupuesto.reduce((a, b) => a + (typeof b.saldo === 'number' ? b.saldo : (b.presupuesto - (porPartida[b.partida] || 0))), 0);
+  const saldoTotal = STATE.presupuesto.reduce((a, b) =>
+    a + (typeof b.saldo === 'number' ? b.saldo : (b.presupuesto - (porPartida[b.partida] || 0))), 0);
   const porc = presupuestoTotal > 0 ? (gastadoTotal / presupuestoTotal * 100) : 0;
   document.getElementById('kpi-presupuesto').textContent = money(presupuestoTotal);
   document.getElementById('kpi-gastado').textContent = money(gastadoTotal);
   document.getElementById('kpi-saldo').textContent = money(saldoTotal);
   document.getElementById('kpi-porc').textContent = porc.toFixed(2) + '%';
 
-  // Missing partidas (gastos sin partida válida)
   const missing = STATE.gastos.filter(g => !g.partida || !STATE.partitdasCatalog.has(g.partida));
   STATE.missingRows = missing;
   document.getElementById('missing-count').textContent = missing.length;
   document.getElementById('missing-alert').style.display = missing.length ? 'block' : 'none';
   renderMissing(missing);
 
-  // Gráfica (nueva)
   renderChart();
-
-  // Movimientos
   renderMovimientos();
-
-  // Persistencia local (opcional)
   saveLS();
 }
 
@@ -272,7 +319,6 @@ function getFiltros() {
     busca: (document.getElementById('f-buscar').value || '').trim().toLowerCase()
   };
 }
-
 function groupGastadoPorPartida(gastos, filtros) {
   const out = {};
   gastos.forEach(g => {
@@ -287,7 +333,7 @@ function renderMissing(rows) {
   const tbody = document.querySelector('#tabla-missing tbody');
   tbody.innerHTML = '';
   rows.forEach(r => {
-    const d = r.fecha ? `${String(r.fecha.getUTCDate()).padStart(2, '0')}/${MES[r.fecha.getUTCMonth()]}/${r.fecha.getUTCFullYear()}` : '�';
+    const d = r.fecha ? `${String(r.fecha.getUTCDate()).padStart(2, '0')}/${MES[r.fecha.getUTCMonth()]}/${r.fecha.getUTCFullYear()}` : '—';
     const tr = document.createElement('tr');
     tr.dataset.partida = r.partida;
     tr.innerHTML = `<td>${d}</td><td>${escapeHtml(r.descripcion || '')}</td><td class="text-end">${money(r.monto)}</td>`;
@@ -304,7 +350,10 @@ function renderMovimientos() {
   movs.forEach(m => {
     const tr = document.createElement('tr');
     tr.dataset.partida = m.destino;
+    const fechaStr = m.fecha ?
+      `${String(m.fecha.getUTCDate()).padStart(2, '0')}/${MES[m.fecha.getUTCMonth()]}/${m.fecha.getUTCFullYear()}` : '—';
     tr.innerHTML = `
+      <td>${fechaStr}</td>
       <td class="fw-semibold">${m.tipo}</td>
       <td>${escapeHtml(m.concepto)}</td>
       <td>${escapeHtml(m.origen)}</td>
@@ -315,9 +364,8 @@ function renderMovimientos() {
   });
 }
 
-/* ================== NUEVO: datasets para la gráfica ================== */
+/* ===== Gráfica ===== */
 function buildChartData(group) {
-  // helper de dataset
   const ds = (label, data) => ({ label, data, borderWidth: 1, backgroundColor: undefined });
 
   if (group === 'global') {
@@ -326,15 +374,7 @@ function buildChartData(group) {
     const totalSaldo = STATE.presupuesto.reduce((a, b) => a + (typeof b.saldo === 'number' ? b.saldo : 0), 0);
     const totalRecon = STATE.presupuesto.reduce((a, b) => a + (b.recon || 0), 0);
     const labels = ['Total'];
-    return {
-      labels,
-      datasets: [
-        ds('Presupuesto', [totalPres]),
-        ds('Gastado', [totalGast]),
-        ds('Saldo', [totalSaldo]),
-        ds('Reconducido', [totalRecon]),
-      ]
-    };
+    return { labels, datasets: [ ds('Presupuesto', [totalPres]), ds('Gastado', [totalGast]), ds('Saldo', [totalSaldo]), ds('Reconducido', [totalRecon]) ] };
   }
 
   if (group === 'partida') {
@@ -343,52 +383,23 @@ function buildChartData(group) {
     const gast = STATE.presupuesto.map(p => p.gastado || 0);
     const sald = STATE.presupuesto.map(p => (typeof p.saldo === 'number' ? p.saldo : 0));
     const reco = STATE.presupuesto.map(p => p.recon || 0);
-    return {
-      labels,
-      datasets: [
-        ds('Presupuesto', pres),
-        ds('Gastado', gast),
-        ds('Saldo', sald),
-        ds('Reconducido', reco),
-      ]
-    };
+    return { labels, datasets: [ ds('Presupuesto', pres), ds('Gastado', gast), ds('Saldo', sald), ds('Reconducido', reco) ] };
   }
 
-  // group === 'mes'  (aproximación: usa última fecha conocida por partida)
-  const byMonth = {
-    pres: new Array(12).fill(0),   // opcional: línea constante de presupuesto anual
-    gast: new Array(12).fill(0),
-    reco: new Array(12).fill(0),
-  };
-
+  const byMonth = { pres: new Array(12).fill(0), gast: new Array(12).fill(0), reco: new Array(12).fill(0) };
   STATE.presupuesto.forEach(p => {
-    if (p.fechaGasto instanceof Date) {
-      byMonth.gast[p.fechaGasto.getUTCMonth()] += p.gastado || 0;
-    }
-    if (p.fechaRecon instanceof Date) {
-      byMonth.reco[p.fechaRecon.getUTCMonth()] += p.recon || 0;
-    }
+    if (p.fechaGasto instanceof Date) byMonth.gast[p.fechaGasto.getUTCMonth()] += p.gastado || 0;
+    if (p.fechaRecon instanceof Date) byMonth.reco[p.fechaRecon.getUTCMonth()] += p.recon || 0;
   });
-
-  // Presupuesto anual como referencia mensual plana
   const totalPres = STATE.presupuesto.reduce((a, b) => a + (b.presupuesto || 0), 0);
   byMonth.pres = byMonth.pres.map(() => totalPres);
 
-  return {
-    labels: MES,
-    datasets: [
-      ds('Presupuesto (anual)', byMonth.pres),
-      ds('Gastado', byMonth.gast),
-      ds('Reconducido', byMonth.reco),
-    ]
-  };
+  return { labels: MES, datasets: [ ds('Presupuesto (anual)', byMonth.pres), ds('Gastado', byMonth.gast), ds('Reconducido', byMonth.reco) ] };
 }
 
-/* ================== NUEVO: render de la gráfica ================== */
 function renderChart() {
   const group = (document.getElementById('chart-group')?.value || 'mes');
   const stacked = !!document.getElementById('chart-stacked')?.checked;
-
   const { labels, datasets } = buildChartData(group);
   const ctx = document.getElementById('chart-mensual');
   if (!ctx) return;
@@ -403,36 +414,33 @@ function renderChart() {
         x: { stacked, ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.1)' } },
         y: { stacked, beginAtZero: true, ticks: { color: '#ffffff' }, grid: { color: 'rgba(255,255,255,0.1)' } }
       },
-      plugins: {
-        legend: { labels: { color: '#ffffff' } },
-        title: { color: '#ffffff' }
-      }
+      plugins: { legend: { labels: { color: '#ffffff' } }, title: { color: '#ffffff' } }
     }
   });
 }
 
 function buildMovimientos() {
   const movs = [];
-  // Reconducciones (solo vista agregada por partida destino)
   STATE.recon.forEach(r => {
     movs.push({
       tipo: 'Reconducción',
-      concepto: r.concepto || '�',
+      concepto: r.concepto || '—',
       origen: r.origen || '',
       destino: r.destino || '',
       monto: Number(r.monto) || 0,
-      ts: 0
+      fecha: r.fecha instanceof Date ? r.fecha : (r.fecha ? new Date(r.fecha) : null),
+      ts: (r.fecha instanceof Date) ? r.fecha.getTime() : (r.fecha ? new Date(r.fecha).getTime() : Date.now())
     });
   });
-  // Gastos
   STATE.gastos.forEach(g => {
-    const ts = g.fecha instanceof Date ? g.fecha.getTime() : 0;
+    const ts = g.fecha instanceof Date ? g.fecha.getTime() : (g.fecha ? new Date(g.fecha).getTime() : 0);
     movs.push({
       tipo: 'Gasto',
-      concepto: g.descripcion || '�',
+      concepto: g.descripcion || '—',
       origen: '',
       destino: g.partida && g.partida.trim() ? g.partida.trim() : '(sin partida)',
       monto: Number(g.monto) || 0,
+      fecha: g.fecha instanceof Date ? g.fecha : (g.fecha ? new Date(g.fecha) : null),
       ts
     });
   });
@@ -479,11 +487,12 @@ document.getElementById('form-recon').addEventListener('submit', async (ev) => {
   const origen = document.getElementById('r-origen').value.trim();
   const destino = document.getElementById('r-destino').value.trim();
   const monto = parseFloat(document.getElementById('r-monto').value);
+  const fecha = document.getElementById('r-fecha').value || new Date().toISOString().slice(0, 10);
   const project = (document.getElementById('proj-code').value || '').trim();
   if (!project) return banner('Captura el ID de proyecto antes de registrar', 'warning');
   if (!origen || !destino || isNaN(monto) || monto <= 0) return banner('Completa origen, destino y monto válido', 'warning');
   try {
-    const r = await apiPost('/api/reconducir', { project, origen, destino, monto, concepto, fecha: new Date().toISOString().slice(0, 10) });
+    const r = await apiPost('/api/reconducir', { project, origen, destino, monto, concepto, fecha });
     if (r.origenNegativo) banner(`La partida ${origen} quedó en negativo (saldo: ${money(r.saldos.origen)})`, 'danger');
     await loadFromAPI(); renderAll();
     banner('Reconducción aplicada', 'success');
@@ -497,10 +506,7 @@ if (navSearchForm) {
     ev.preventDefault();
     const input = document.getElementById('proj-code');
     const rawValue = (input?.value || '').trim();
-    if (!rawValue) {
-      input?.focus();
-      return;
-    }
+    if (!rawValue) { input?.focus(); return; }
     showSpinner(true);
     try {
       await loadFromAPI();
@@ -513,13 +519,11 @@ if (navSearchForm) {
         banner(`No se encontraron registros para <strong>${escapeHtml(rawValue)}</strong>.`, 'warning');
         return;
       }
-      if (foundPartida) {
-        showPartidaDetails(rawValue);
-        return;
-      }
+      if (foundPartida) { showPartidaDetails(rawValue); return; }
       const totalPresupuesto = STATE.presupuesto.reduce((acc, row) => acc + (row.presupuesto || 0), 0);
       const totalGastado = STATE.presupuesto.reduce((acc, row) => acc + (row.gastado || 0), 0);
-      const totalSaldo = STATE.presupuesto.reduce((acc, row) => acc + (typeof row.saldo === 'number' ? row.saldo : (row.presupuesto - (row.gastado || 0))), 0);
+      const totalSaldo = STATE.presupuesto.reduce((acc, row) =>
+        acc + (typeof row.saldo === 'number' ? row.saldo : (row.presupuesto - (row.gastado || 0))), 0);
       const totalRecon = STATE.presupuesto.reduce((acc, row) => acc + (row.recon || 0), 0);
       const resumen = `
         <div class="d-flex flex-column gap-1 small">
@@ -542,6 +546,13 @@ if (navSearchForm) {
 
 // Filtros
 document.getElementById('btn-aplicar').addEventListener('click', renderAll);
+document.getElementById('btn-limpiar')?.addEventListener('click', () => {
+  const fp = document.getElementById('f-partida');
+  const fb = document.getElementById('f-buscar');
+  if (fp) fp.value = '';
+  if (fb) fb.value = '';
+  renderAll();
+});
 
 // Reiniciar solo UI
 function clearUIOnly() {
@@ -594,10 +605,8 @@ function exportMissingCsv() {
   const a = document.createElement('a');
   a.href = url; a.download = 'gastos_sin_partida.csv'; document.body.appendChild(a); a.click();
   document.body.removeChild(a); URL.revokeObjectURL(url);
-  
   banner('CSV exportado correctamente', 'success');
 }
-
 document.getElementById('btn-export-missing').addEventListener('click', exportMissingCsv);
 document.getElementById('btn-export-missing-footer').addEventListener('click', exportMissingCsv);
 
@@ -624,7 +633,8 @@ function exportXlsx() {
       Concepto: r.concepto || '',
       Origen: r.origen,
       Destino: r.destino,
-      Monto: r.monto
+      Monto: r.monto,
+      Fecha: r.fecha ? r.fecha.toISOString().slice(0, 10) : ''
     }))
   );
   XLSX.utils.book_append_sheet(wb, shRecon, 'Reconducciones');
@@ -644,14 +654,18 @@ function exportXlsx() {
 
   const code = (document.getElementById('proj-code').value || 'proyecto').replace(/[^a-z0-9_\-]+/gi, '_');
   XLSX.writeFile(wb, `control_presupuesto_${code}.xlsx`);
-  
   banner('Excel exportado correctamente', 'success');
 }
-
 document.getElementById('btn-export-xlsx').addEventListener('click', exportXlsx);
 
 // Init
 window.addEventListener('DOMContentLoaded', async () => {
+  const today = new Date().toISOString().split('T')[0];
+  const gFecha = document.getElementById('g-fecha');
+  const rFecha = document.getElementById('r-fecha');
+  if (gFecha) gFecha.value = today;
+  if (rFecha) rFecha.value = today;
+
   const project = (document.getElementById('proj-code').value || '').trim();
   if (project) {
     try {
@@ -673,16 +687,16 @@ document.getElementById('proj-code').addEventListener('change', async () => {
   await loadFromAPI(); renderAll();
 });
 
-// Persistencia local (opcional)
+// Persistencia local
 function saveLS() {
   const data = {
     presupuesto: STATE.presupuesto,
     gastos: STATE.gastos.map(g => ({ ...g, fecha: g.fecha ? g.fecha.toISOString() : null })),
-    recon: STATE.recon
+    recon: STATE.recon.map(r => ({ ...r, fecha: r.fecha ? r.fecha.toISOString() : null }))
   };
   localStorage.setItem(LS_KEY, JSON.stringify(data));
 }
 
-/* ===== Listeners para la gráfica ===== */
+/* Listeners gráfica */
 document.getElementById('chart-group')?.addEventListener('change', renderChart);
 document.getElementById('chart-stacked')?.addEventListener('change', renderChart);

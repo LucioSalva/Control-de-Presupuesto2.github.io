@@ -1,6 +1,5 @@
 ﻿<!doctype html>
 <html lang="es">
-
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -14,41 +13,34 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <!-- XLSX -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- SweetAlert2 -->
   <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
-
-
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 
 <body>
   <nav class="navbar navbar-expand-lg navbar-dark shadow-sm">
     <div class="container-fluid">
-      <a class="navbar-brand fw-semibold" href="#">
-        <i class="bi bi-graph-up-arrow me-2"></i>Control Presupuestal
+      <a class="navbar-brand fw-semibold">
+        <i class="bi bi-currency-dollar me-2"></i>Control Presupuestal
       </a>
 
-      <div class="ms-auto d-flex gap-2 align-items-center">
-        <!-- Buscar proyecto/partida -->
-        <form id="nav-search" class="nav-search" autocomplete="off">
-          <button type="submit" class="nav-search__btn" aria-label="Buscar ID">
-            <i class="bi bi-search"></i>
-          </button>
-          <input id="proj-code" class="form-control form-control-sm nav-search__input" placeholder="ID presupuesto o partida">
-        </form>
+      <!-- Buscar proyecto/partida -->
+      <form id="nav-search" class="nav-search" autocomplete="off">
+        <button type="submit" class="nav-search__btn" aria-label="Buscar ID">
+          <i class="bi bi-search"></i>
+        </button>
+        <input id="proj-code" class="form-control form-control-sm nav-search__input" placeholder="ID Presupuesto">
+      </form>
 
-        <!-- Exportar Excel -->
+      <div class="ms-auto d-flex gap-2 align-items-center">
         <button id="btn-export-xlsx" class="btn btn-outline-light btn-sm">
           <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
         </button>
-
-        <button id="btn-save" class="btn btn-success btn-sm d-none">
-          <i class="bi bi-cloud-check me-1"></i>Guardar
-        </button>
-
-        <!-- Reiniciar -->
         <button id="btn-reset" class="btn btn-outline-danger btn-sm">
-          <i class="bi bi-trash3 me-1"></i>Reiniciar
+          <i class="bi bi-eraser me-1"></i>Reiniciar
         </button>
       </div>
     </div>
@@ -67,7 +59,7 @@
                 <div class="kpi-title">Presupuesto total</div>
                 <h4 id="kpi-presupuesto" class="mb-0">—</h4>
               </div>
-              <i class="bi bi-piggy-bank fs-1 text-muted-2"></i>
+              <i class="bi bi-cash-coin fs-1 text-muted-2"></i>
             </div>
           </div>
         </div>
@@ -80,7 +72,7 @@
                 <div class="kpi-title">Gastado</div>
                 <h4 id="kpi-gastado" class="mb-0">—</h4>
               </div>
-              <i class="bi bi-cash-coin fs-1 text-muted-2"></i>
+              <i class="bi bi-graph-down-arrow fs-1 text-muted-2"></i>
             </div>
           </div>
         </div>
@@ -184,7 +176,6 @@
                 <input type="text" class="form-control" id="r-destino" placeholder="Partida" required>
               </div>
 
-              <!-- NUEVO: Fecha de reconducción -->
               <div class="col-6">
                 <label class="form-label">Fecha</label>
                 <input type="date" class="form-control" id="r-fecha">
@@ -211,10 +202,8 @@
             <div class="d-flex justify-content-between align-items-center mb-2">
               <h6 class="mb-0">Presupuesto por Partida</h6>
               <div class="d-flex align-items-center gap-2">
-                <input id="f-partida" type="text" class="form-control form-control-sm w-auto"
-                  placeholder="Filtrar partida">
-                <input id="f-buscar" type="text" class="form-control form-control-sm w-auto"
-                  placeholder="Buscar en descripción">
+                <input id="f-partida" type="text" class="form-control form-control-sm w-auto" placeholder="Filtrar partida">
+                <input id="f-buscar" type="text" class="form-control form-control-sm w-auto" placeholder="Buscar en descripción">
                 <button id="btn-aplicar" class="btn btn-primary btn-sm">
                   <i class="bi bi-funnel me-1"></i>Filtrar
                 </button>
@@ -286,7 +275,6 @@
                   <table class="table table-sm align-middle" id="tabla-movs">
                     <thead>
                       <tr>
-                        <!-- NUEVO: columna de fecha -->
                         <th>Fecha</th>
                         <th>Tipo</th>
                         <th>Concepto / Descripción</th>
@@ -302,6 +290,9 @@
             </div>
           </div>
         </div>
+
+      </div><!-- /col derecha -->
+    </div><!-- /row -->
 
   </main>
 
@@ -341,11 +332,11 @@
     <div class="spinner-border text-light" role="status"></div>
   </div>
 
-  <!-- Tu script debe ir antes o después de Bootstrap; con DOMContentLoaded no hay problema -->
-  <script src="script.js"></script>
+  <!-- Bootstrap bundle -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <!-- Tu lógica -->
+  <script src="js/script.js"></script>
+  <!-- (Opcional) si usas un archivo extra de alerts personalizados -->
+  <!-- <script src="js/alerts.js"></script> -->
 </body>
-
 </html>
-
