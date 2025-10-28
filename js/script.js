@@ -83,6 +83,24 @@ async function apiDelete(path) {
   return d;
 }
 
+// Función para verificar partida duplicada por mes
+async function checkDuplicatePartida(partida, monto, mes, project) {
+  if (!partida || !mes || !project) return false;
+  
+  try {
+    const qs = `?project=${encodeURIComponent(project)}&mes=${encodeURIComponent(mes)}`;
+    const detalles = await apiGet('/api/detalles' + qs);
+    
+    return detalles.some(d => 
+      normalizeKey(d.partida) === normalizeKey(partida) && 
+      Math.abs(Number(d.presupuesto) - monto) < 0.01 // Comparación con tolerancia para decimales
+    );
+  } catch (error) {
+    console.warn('Error al verificar duplicados:', error);
+    return false;
+  }
+}
+
 /* ================== NORMALIZADOR DE RECONDUCCIONES ================== */
 function mergeReconPairs(reconsRaw) {
   if (!Array.isArray(reconsRaw) || !reconsRaw.length) return [];
@@ -453,15 +471,52 @@ document.getElementById('form-partida').addEventListener('submit', async (ev) =>
   ev.preventDefault();
   const clave = document.getElementById('p-partida').value.trim();
   const presupuesto = parseFloat(document.getElementById('p-monto').value);
+  const mes = document.getElementById('p-mes').value;
   const project = (document.getElementById('proj-code').value || '').trim();
+  
   if (!project) return banner('Captura el ID de proyecto antes de registrar', 'warning');
-  if (!clave || isNaN(presupuesto)) return banner('Captura partida y presupuesto válidos', 'warning');
+  if (!clave || isNaN(presupuesto) || !mes) return banner('Captura partida, presupuesto y mes válidos', 'warning');
+  
   try {
-    await apiPost('/api/detalles', { project, partida: clave, presupuesto });
-    await loadFromAPI(); renderAll();
+    // Verificar si ya existe la partida en el mismo mes
+    const esDuplicado = await checkDuplicatePartida(clave, presupuesto, mes, project);
+    
+    if (esDuplicado) {
+      const mesNombre = new Date(mes + '-01').toLocaleDateString('es-MX', { year: 'numeric', month: 'long' });
+      
+      const result = await Swal.fire({
+        title: '¿Partida duplicada?',
+        html: `En <strong>${mesNombre}</strong> ya existe la partida <strong>"${escapeHtml(clave)}"</strong> con el monto <strong>${money(presupuesto)}</strong>. ¿Deseas guardarla de todos modos?`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Sí, guardar',
+        cancelButtonText: 'No, cancelar',
+        background: '#1a1a1a',
+        color: '#ffffff',
+        customClass: { popup: 'sweetalert-duplicate-alert' }
+      });
+      
+      if (!result.isConfirmed) {
+        banner('Partida no guardada', 'info');
+        return;
+      }
+    }
+    
+    // Guardar la partida
+    await apiPost('/api/detalles', { 
+      project, 
+      partida: clave, 
+      presupuesto,
+      mes
+    });
+    
+    await loadFromAPI(); 
+    renderAll();
     banner('Partida guardada', 'success');
     ev.target.reset();
-  } catch (e) { banner(e.message, 'danger'); }
+  } catch (e) { 
+    banner(e.message, 'danger'); 
+  }
 });
 
 document.getElementById('form-gasto').addEventListener('submit', async (ev) => {
@@ -663,8 +718,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   const today = new Date().toISOString().split('T')[0];
   const gFecha = document.getElementById('g-fecha');
   const rFecha = document.getElementById('r-fecha');
+  const pMes = document.getElementById('p-mes');
+  
   if (gFecha) gFecha.value = today;
   if (rFecha) rFecha.value = today;
+  if (pMes) pMes.value = today.slice(0, 7); // Formato YYYY-MM
 
   const project = (document.getElementById('proj-code').value || '').trim();
   if (project) {
