@@ -802,6 +802,7 @@ body * {
 #project-mode-container .card-project-mode,
 #project-create-container .card-project-create {
   background-color: #ffffff;
+  margin-top: 45px;
   border-radius: 0.75rem;
   border: 1px solid #e5e7eb;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
