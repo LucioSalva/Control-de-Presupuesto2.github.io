@@ -17,46 +17,41 @@
 </head>
 
 <body>
-  <!-- NAVBAR PRINCIPAL -->
+<!-- NAVBAR PRINCIPAL -->
   <nav class="navbar navbar-expand-lg shadow-sm">
-  <div class="container-fluid">
-    <a class="navbar-brand fw-semibold">
-      <i class="bi bi-currency-dollar me-2"></i>Control Presupuestal
-    </a>
+    <div class="container-fluid">
+      <a class="navbar-brand fw-semibold">
+        <i class="bi bi-currency-dollar me-2 "></i>Control Presupuestal
+      </a>
 
-    <!-- Buscar proyecto/partida -->
-    <form id="nav-search" class="nav-search" autocomplete="off">
-      <button type="submit" class="nav-search__btn" aria-label="Buscar ID">
-        <i class="bi bi-search"></i>
-      </button>
-      <input id="proj-code" type="text" name="proj-code"
-             class="form-control form-control-sm nav-search__input"
-             aria-label="ID del proyecto" placeholder="ID Presupuesto">
-    </form>
+      <!-- Buscar proyecto/partida -->
+      <form id="nav-search" class="nav-search" autocomplete="off">
+        <button type="submit" class="nav-search__btn" aria-label="Buscar ID">
+          <i class="bi bi-search"></i>
+        </button>
+        <input id="proj-code" type="text" name="proj-code" class="form-control form-control-sm nav-search__input"
+          aria-label="ID del proyecto" placeholder="ID Presupuesto">
+      </form>
 
-    <div class="logo-container">
-      <img src="/public/img/ayuntamiento-de-ecatepec.png"
-           alt="Ayuntamiento de Ecatepec" class="navbar-logo">
+      <div class="logo-container">
+        <img src="/public/img/ayuntamiento-de-ecatepec.png" alt="Ayuntamiento de Ecatepec" class="navbar-logo">
+      </div>
+
+
+      <div class="ms-auto d-flex gap-2 align-items-center">
+
+        
+
+        <div class="d-flex align-items-center gap-3">
+          <span id="userInfo" class="text-white fw-bold"></span>
+
+          <button id="btnLogout" class="btn btn-sm btn-outline-light bi bi-door-open">
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
     </div>
-
-
-    <div class="ms-auto d-flex gap-2 align-items-center">
-      <button id="btn-export-xlsx" class="btn btn-outline-success btn-sm">
-        <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
-      </button>
-      <button id="btn-reset" class="btn btn-outline-danger btn-sm">
-        <i class="bi bi-eraser me-1"></i>Reiniciar
-      </button>
-      <div class="d-flex align-items-center gap-3">
-      <span id="userInfo" class="text-white fw-bold"></span>
-
-      <button id="btnLogout" class="btn btn-sm btn-outline-light">
-        Cerrar sesión
-      </button>
-    </div>
-    </div>
-  </div>
-</nav>
+  </nav>
 
   <!-- NAVBAR DE PESTAÑAS -->
   <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm" style="min-height: 40px;">
@@ -78,11 +73,23 @@
           </a>
         </li>
         <li class="nav-item">
-        <a class="nav-link" href="reporte-ejecucion.html">
-          <i class="bi bi-diagram-3 me-1"></i>Ejecución
-        </a>
-      </li>
+          <a class="nav-link" href="reporte-ejecucion.html">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i>Ejecución
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="suficiencia_presupuestal.html">
+            <i class="bi bi-pencil me-1"></i>Suficiencia Presupuestal
+          </a>
+        </li>
       </ul>
+      <button id="btn-export-xlsx" class="btn btn-outline-success btn-sm">
+          <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
+        </button>
+
+        <button id="btn-reset" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-eraser me-1"></i>Reiniciar
+        </button>
     </div>
   </nav>
 

@@ -1,0 +1,94 @@
+/* ============ 404 PAGE ============ */
+
+.cp-404 {
+  min-height: 100vh;
+  padding-top: 90px;          /* espacio por la navbar fija */
+  background: #f5f5f5;
+}
+
+.cp-404-card {
+  max-width: 520px;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 32px 26px;
+  margin: 0 16px;
+}
+
+.cp-404-code {
+  font-size: 74px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: #691c32;
+  margin-bottom: 8px;
+}
+
+.cp-404-code span {
+  color: #f4b000; /* un detalle en amarillo Ecatepec style */
+}
+
+.cp-404-title {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.cp-404-text {
+  font-size: 14px;
+  color: #6c757d;
+}
+
+/* Botón vino reutilizable */
+.btn-vino {
+  background-color: #691c32;
+  border-color: #691c32;
+  color: #ffffff;
+}
+
+.btn-vino:hover {
+  background-color: #5a1629;
+  border-color: #5a1629;
+  color: #ffffff;
+}
+
+#mai{
+  padding: 0;
+  margin-top: -5px;
+}
+
+/* ===== Responsivo ===== */
+
+/* Smartphone */
+@media (max-width: 767.98px) {
+  .cp-404-card {
+    padding: 24px 18px;
+  }
+
+  .cp-404-code {
+    font-size: 60px;
+  }
+
+  .cp-404-title {
+    font-size: 18px;
+  }
+}
+
+/* Tablet */
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .cp-404-card {
+    max-width: 480px;
+  }
+}
+
+/* Desktop normal */
+@media (min-width: 1024px) and (max-width: 1439.98px) {
+  .cp-404-card {
+    max-width: 540px;
+  }
+}
+
+/* Desktop grande */
+@media (min-width: 1440px) {
+  .cp-404-card {
+    max-width: 600px;
+  }
+}

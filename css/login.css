@@ -1,6 +1,10 @@
 /* Fondo general */
 body {
   background: #f0f2f5;
+  background-image: url("/public/img/logo\ flor.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 850px;
   font-family: "Segoe UI", sans-serif;
 }
 
@@ -8,14 +12,30 @@ body {
 .login-card {
   max-width: 420px;
   width: 100%;
-  border: none;
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
   overflow: hidden;
+}
+
+.login-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    120deg,
+    rgba(255, 255, 255, 0.25),
+    rgba(255, 255, 255, 0.05)
+  );
+  pointer-events: none;
 }
 
 /* Encabezado */
 .login-header {
-  background: #003366;
+  background: #691c32;
   color: white;
   padding: 18px 20px;
   text-align: center;
@@ -54,3 +74,5 @@ body {
   font-size: 0.9rem;
   margin-top: -5px;
 }
+
+

@@ -4,15 +4,25 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { query, getClient } from "./db.js";
 
 dotenv.config();
 
 const app = express();
 
+// Para poder armar rutas absolutas (static, 404.html, etc.)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // CORS abierto en desarrollo
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+
+// Servir archivos estáticos (HTML, CSS, JS, imágenes)
+// Ajusta "public" si tu carpeta del frontend tiene otro nombre.
+app.use(express.static(path.join(__dirname, "public")));
 
 // saldo = presupuesto - total_gastado + total_reconducido
 function computeSaldo({
@@ -124,12 +134,12 @@ app.post("/api/login", async (req, res) => {
       return res.status(403).json({ error: "Usuario inactivo" });
     }
 
-    // ⚠ SIN bcrypt, comparación directa (como tú quieres)
+    // ⚠ SIN bcrypt, comparación directa
     if (user.password !== password) {
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
 
-    // Token "de mentiritas" solo para guardar algo en localStorage
+    // Token "de mentiritas"
     const token = `token-${user.id}-${Date.now()}`;
 
     return res.json({
@@ -206,7 +216,7 @@ app.post("/api/detalles", async (req, res) => {
         .json({ error: "project, partida y presupuesto son obligatorios" });
     }
 
-    // Valida llaves de proyecto (vienen del front al crear el proyecto)
+    // Valida llaves de proyecto
     const keys = await getProjectKeys({
       id_proyecto: project,
       id_dgeneral,
@@ -232,16 +242,16 @@ app.post("/api/detalles", async (req, res) => {
           saldo_disponible
         )
         VALUES (
-          NOW(),          -- usamos fecha_registro en vez de 'mes'
-          $1,             -- id_dgeneral
-          $2,             -- id_dauxiliar
-          $3,             -- id_fuente
-          $4,             -- id_proyecto
-          $5,             -- partida
-          $6,             -- presupuesto
+          NOW(),
+          $1,
+          $2,
+          $3,
+          $4,
+          $5,
+          $6,
           0,
           0,
-          $6              -- saldo_disponible inicia igual al presupuesto
+          $6
         )
         ON CONFLICT (
           id_dgeneral,
@@ -289,7 +299,6 @@ app.post("/api/detalles", async (req, res) => {
 
 /**
  * GET /api/gastos?project=ID
- * Regresa el historial de gastos del proyecto desde la tabla public.gastos_detalle
  */
 app.get("/api/gastos", async (req, res) => {
   try {
@@ -318,8 +327,6 @@ app.get("/api/gastos", async (req, res) => {
 
 /**
  * POST /api/gastos
- * body: { project, partida, fecha, descripcion, monto }
- * Inserta en gastos_detalle y recalcula total_gastado + saldo_disponible en presupuesto_detalle
  */
 app.post("/api/gastos", async (req, res) => {
   try {
@@ -342,7 +349,6 @@ app.post("/api/gastos", async (req, res) => {
     try {
       await client.query("BEGIN");
 
-      // 1) Tomamos la fila de presupuesto_detalle para ESTA partida
       const detResult = await client.query(
         `
         SELECT id_dgeneral,
@@ -376,8 +382,6 @@ app.post("/api/gastos", async (req, res) => {
         total_reconducido,
       } = detResult.rows[0];
 
-      // 2) Si alguna llave viene NULL (proyectos viejos),
-      //    buscamos cualquier otra fila del MISMO proyecto que sí tenga llaves
       if (id_dgeneral == null || id_dauxiliar == null || id_fuente == null) {
         const keysFallback = await client.query(
           `
@@ -409,7 +413,6 @@ app.post("/api/gastos", async (req, res) => {
         id_fuente = keysFallback.rows[0].id_fuente;
       }
 
-      // 3) Insertar en historial de gastos con las llaves ya resueltas
       await client.query(
         `
         INSERT INTO public.gastos_detalle (
@@ -436,7 +439,6 @@ app.post("/api/gastos", async (req, res) => {
         ]
       );
 
-      // 4) Recalcular total_gastado a partir del historial
       const tot = await client.query(
         `
         SELECT COALESCE(SUM(monto),0) AS total_gastado
@@ -448,14 +450,12 @@ app.post("/api/gastos", async (req, res) => {
       );
       const total_gastado = Number(tot.rows[0].total_gastado || 0);
 
-      // 5) Calcular nuevo saldo
       const saldo = computeSaldo({
         presupuesto,
         total_gastado,
         total_reconducido,
       });
 
-      // 6) Actualizar totales en presupuesto_detalle
       const upd = await client.query(
         `
         UPDATE presupuesto_detalle
@@ -485,7 +485,6 @@ app.post("/api/gastos", async (req, res) => {
 
 /**
  * DELETE /api/gastos/:id
- * Borra un gasto del historial y recalcula total_gastado + saldo_disponible.
  */
 app.delete("/api/gastos/:id", async (req, res) => {
   try {
@@ -496,7 +495,6 @@ app.delete("/api/gastos/:id", async (req, res) => {
     try {
       await client.query("BEGIN");
 
-      // 1) Recuperar el gasto para saber proyecto y partida
       const old = await client.query(
         `SELECT id_proyecto AS "idProyecto", partida
            FROM public.gastos_detalle
@@ -511,12 +509,10 @@ app.delete("/api/gastos/:id", async (req, res) => {
 
       const { idProyecto, partida } = old.rows[0];
 
-      // 2) Borrar el gasto
       await client.query(`DELETE FROM public.gastos_detalle WHERE id = $1`, [
         id,
       ]);
 
-      // 3) Recalcular total_gastado
       const tot = await client.query(
         `SELECT COALESCE(SUM(monto),0) AS total_gastado
            FROM public.gastos_detalle
@@ -525,7 +521,6 @@ app.delete("/api/gastos/:id", async (req, res) => {
       );
       const total_gastado = Number(tot.rows[0].total_gastado || 0);
 
-      // 4) Obtener presupuesto y total_reconducido actuales
       const det = await client.query(
         `SELECT presupuesto, total_reconducido
            FROM presupuesto_detalle
@@ -545,7 +540,6 @@ app.delete("/api/gastos/:id", async (req, res) => {
         total_reconducido: row.total_reconducido,
       });
 
-      // 5) Actualizar totales en presupuesto_detalle
       const upd = await client.query(
         `UPDATE presupuesto_detalle
             SET total_gastado    = $1,
@@ -596,7 +590,6 @@ app.post("/api/reconducir", async (req, res) => {
     try {
       await client.query("BEGIN");
 
-      // 1) ORIGEN: debe existir
       const qOrigen = await client.query(
         `SELECT id_dgeneral,
                 id_dauxiliar,
@@ -621,7 +614,6 @@ app.post("/api/reconducir", async (req, res) => {
 
       const origenRow = qOrigen.rows[0];
 
-      // 2) DESTINO: si no existe, se crea con los mismos catálogos del origen
       let qDestino = await client.query(
         `SELECT id_dgeneral,
                 id_dauxiliar,
@@ -669,7 +661,6 @@ app.post("/api/reconducir", async (req, res) => {
           ]
         );
 
-        // Releer DESTINO ya creado
         qDestino = await client.query(
           `SELECT id_dgeneral,
                   id_dauxiliar,
@@ -687,7 +678,6 @@ app.post("/api/reconducir", async (req, res) => {
 
       const destinoRow = qDestino.rows[0];
 
-      // 3) ORIGEN (- monto en total_reconducido)
       const nuevoReconOrigen =
         Number(origenRow.total_reconducido || 0) - monto;
 
@@ -708,7 +698,6 @@ app.post("/api/reconducir", async (req, res) => {
         [nuevoReconOrigen, fecha, concepto, saldoOrigen, project, origen]
       );
 
-      // 4) DESTINO (+ monto en total_reconducido)
       const nuevoReconDestino =
         Number(destinoRow.total_reconducido || 0) + monto;
 
@@ -781,7 +770,7 @@ app.get("/api/projects", async (_req, res) => {
     const r = await query(`
       SELECT
         id_proyecto                       AS project,
-        MIN(id_dgeneral)                  AS id_dgeneral,  -- clave de área
+       MIN(id_dgeneral)                  AS id_dgeneral,
         COUNT(*)                          AS partidas,
         COALESCE(SUM(presupuesto),0)      AS presupuesto_total,
         COALESCE(SUM(total_gastado),0)    AS gastado_total,
@@ -796,7 +785,6 @@ app.get("/api/projects", async (_req, res) => {
     res.status(500).json({ error: "Error obteniendo proyectos" });
   }
 });
-
 
 /* =====================================================
    Checadores de duplicados
@@ -912,37 +900,42 @@ app.get("/api/catalogos/proyectos", async (_req, res) => {
 
 // =====================================================
 //  ADMINISTRACIÓN DE USUARIOS (CRUD)
-//  (PÉGALO ANTES DE app.listen(...))
 // =====================================================
 
-// LISTAR usuarios
-app.get("/api/admin/usuarios", async (req, res) => {
+// LISTA completa (única versión, ya sin duplicados)
+app.get("/api/admin/usuarios", async (_req, res) => {
   try {
-    const r = await query(`
-      SELECT 
+    const sql = `
+      SELECT
         u.id,
         u.nombre_completo,
         u.usuario,
         u.correo,
-        u.password,
-        u.id_dgeneral,
         u.activo,
         u.fecha_creacion,
+        u.id_dgeneral,
+        d.clave       AS dgeneral_clave,
         d.dependencia AS dgeneral_nombre,
-        ARRAY(
-          SELECT r.clave
-          FROM usuario_rol ur
-          JOIN roles r ON r.id = ur.id_rol
-          WHERE ur.id_usuario = u.id
+        COALESCE(
+          ARRAY_AGG(r.clave ORDER BY r.clave)
+          FILTER (WHERE r.clave IS NOT NULL),
+          '{}'::varchar[]
         ) AS roles
       FROM usuarios u
-      LEFT JOIN dgeneral d ON d.id = u.id_dgeneral
+      LEFT JOIN dgeneral d      ON d.id = u.id_dgeneral
+      LEFT JOIN usuario_rol ur  ON ur.id_usuario = u.id
+      LEFT JOIN roles r         ON r.id = ur.id_rol
+      GROUP BY
+        u.id,
+        d.clave,
+        d.dependencia
       ORDER BY u.id;
-    `);
+    `;
 
-    res.json(r.rows);
-  } catch (e) {
-    console.error("GET /api/admin/usuarios ERROR:", e);
+    const result = await query(sql);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("GET /api/admin/usuarios error:", err);
     res.status(500).json({ error: "Error obteniendo usuarios" });
   }
 });
@@ -994,18 +987,15 @@ app.post("/api/admin/usuarios", async (req, res) => {
 
     const newId = ins.rows[0].id;
 
-    // Borrar roles previos por si acaso (no debería haber, pero por seguridad)
     await client.query("DELETE FROM usuario_rol WHERE id_usuario = $1", [
       newId,
     ]);
 
-    // Insertar roles si vienen
     if (Array.isArray(roles) && roles.length > 0) {
       for (const rClave of roles) {
         const r = String(rClave || "").trim().toUpperCase();
         if (!r) continue;
 
-        // Buscar ID de rol por clave
         const rolRow = await client.query(
           "SELECT id FROM roles WHERE UPPER(clave) = $1 LIMIT 1",
           [r]
@@ -1032,7 +1022,6 @@ app.post("/api/admin/usuarios", async (req, res) => {
     await client.query("ROLLBACK");
     console.error("POST /api/admin/usuarios ERROR:", e);
 
-    // Violación de UNIQUE (usuario o correo)
     if (e.code === "23505") {
       return res
         .status(400)
@@ -1070,7 +1059,6 @@ app.put("/api/admin/usuarios/:id", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // Si viene password, la actualizamos, si no, la dejamos igual
     if (password && password.trim().length > 0) {
       await client.query(
         `
@@ -1115,7 +1103,6 @@ app.put("/api/admin/usuarios/:id", async (req, res) => {
       );
     }
 
-    // Actualizar roles
     await client.query("DELETE FROM usuario_rol WHERE id_usuario = $1", [id]);
 
     if (Array.isArray(roles) && roles.length > 0) {
@@ -1180,53 +1167,24 @@ app.delete("/api/admin/usuarios/:id", async (req, res) => {
   }
 });
 
+/* =====================================================
+   404 — RUTAS NO ENCONTRADAS
+   (debe ir ANTES de app.listen)
+   ===================================================== */
+app.use((req, res, next) => {
+  // Si es ruta de API → 404 JSON
+  if (req.originalUrl.startsWith("/api/")) {
+    return res.status(404).json({ error: "Ruta de API no encontrada" });
+  }
 
-
+  // Para cualquier otra ruta → servir 404.html del frontend
+  res.status(404).sendFile(
+  path.join(__dirname, "..", "frontend", "404.html")
+);
+});
 
 /* ======================== Arranque ============================= */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("API escuchando en http://localhost:" + PORT);
-});
-
-
-/* =====================================================
-   ADMIN: LISTA DE USUARIOS
-   ===================================================== */
-
-app.get("/api/admin/usuarios", async (_req, res) => {
-  try {
-    const sql = `
-      SELECT
-        u.id,
-        u.nombre_completo,
-        u.usuario,
-        u.correo,
-        u.activo,
-        u.fecha_creacion,
-        u.id_dgeneral,
-        d.clave       AS dgeneral_clave,
-        d.dependencia AS dgeneral_nombre,
-        COALESCE(
-          ARRAY_AGG(r.clave ORDER BY r.clave)
-          FILTER (WHERE r.clave IS NOT NULL),
-          '{}'::varchar[]
-        ) AS roles
-      FROM usuarios u
-      LEFT JOIN dgeneral d      ON d.id = u.id_dgeneral
-      LEFT JOIN usuario_rol ur  ON ur.id_usuario = u.id
-      LEFT JOIN roles r         ON r.id = ur.id_rol
-      GROUP BY
-        u.id,
-        d.clave,
-        d.dependencia
-      ORDER BY u.id;
-    `;
-
-    const result = await query(sql);
-    res.json(result.rows);
-  } catch (err) {
-    console.error("GET /api/admin/usuarios error:", err);
-    res.status(500).json({ error: "Error obteniendo usuarios" });
-  }
 });
