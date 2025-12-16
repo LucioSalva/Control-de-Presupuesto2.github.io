@@ -1,29 +1,24 @@
 <!doctype html>
 <html lang="es">
-
 <head>
-    <meta charset="utf-8" />
-    <title>Suficiencia Presupuestal 2025</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta charset="utf-8" />
+  <title>Suficiencia Presupuestal 2025</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Bootstrap para que se vea decente -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-    <link rel="stylesheet" href="css/suficiencia_presupuestal.css">
-    <link rel="stylesheet" href="css/nabvar.css">
-
-
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link rel="stylesheet" href="css/suficiencia_presupuestal.css">
+  <link rel="stylesheet" href="css/nabvar.css">
 </head>
 
 <body>
-<!-- NAVBAR PRINCIPAL -->
+  <!-- NAVBAR PRINCIPAL -->
   <nav class="navbar navbar-expand-lg shadow-sm">
     <div class="container-fluid">
       <a class="navbar-brand fw-semibold">
-        <i class="bi bi-currency-dollar me-2 "></i>Control Presupuestal
+        <i class="bi bi-currency-dollar me-2"></i>Control Presupuestal
       </a>
 
-      <!-- Buscar proyecto/partida -->
       <form id="nav-search" class="nav-search" autocomplete="off">
         <button type="submit" class="nav-search__btn" aria-label="Buscar ID">
           <i class="bi bi-search"></i>
@@ -36,17 +31,10 @@
         <img src="/public/img/ayuntamiento-de-ecatepec.png" alt="Ayuntamiento de Ecatepec" class="navbar-logo">
       </div>
 
-
       <div class="ms-auto d-flex gap-2 align-items-center">
-
-
-
         <div class="d-flex align-items-center gap-3">
           <span id="userInfo" class="text-white fw-bold"></span>
-
-          <button id="btnLogout" class="btn btn-sm btn-outline-light bi bi-door-open">
-            Cerrar sesión
-          </button>
+          <button id="btnLogout" class="btn btn-sm btn-outline-light bi bi-door-open">Cerrar sesión</button>
         </div>
       </div>
     </div>
@@ -56,234 +44,196 @@
   <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm" style="min-height: 40px;">
     <div class="container-fluid">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0" style="flex-direction: row;">
-        <li class="nav-item">
-          <a class="nav-link active" href="index.html">
-            <i class="bi bi-house me-1"></i>Presupuesto
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="partidas.html">
-            <i class="bi bi-list-check me-1"></i>Partidas Detalladas
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="projects.html">
-            <i class="bi bi-diagram-3 me-1"></i>Proyectos
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="reporte-ejecucion.html">
-            <i class="bi bi-file-earmark-spreadsheet me-1"></i>Ejecución
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="suficiencia_presupuestal.html">
-            <i class="bi bi-pencil me-1"></i>Suficiencia Presupuestal
-          </a>
-        </li>
+        <li class="nav-item"><a class="nav-link" href="index.html"><i class="bi bi-house me-1"></i>Presupuesto</a></li>
+        <li class="nav-item"><a class="nav-link" href="partidas.html"><i class="bi bi-list-check me-1"></i>Partidas Detalladas</a></li>
+        <li class="nav-item"><a class="nav-link" href="projects.html"><i class="bi bi-diagram-3 me-1"></i>Proyectos</a></li>
+        <li class="nav-item"><a class="nav-link" href="reporte-ejecucion.html"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Ejecución</a></li>
+        <li class="nav-item"><a class="nav-link active" href="suficiencia_presupuestal.html"><i class="bi bi-pencil me-1"></i>Suficiencia Presupuestal</a></li>
       </ul>
-      <button id="btn-export-xlsx" class="btn btn-outline-success btn-sm">
-        <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
-      </button>
-
-      <button id="btn-reset" class="btn btn-outline-danger btn-sm">
-        <i class="bi bi-eraser me-1"></i>Reiniciar
-      </button>
     </div>
   </nav>
 
-    <div class="container mt-5 mb-2 no-print">
-        <div class="d-flex gap-2 justify-content-start">
-            <button class="btn btn-secondary btn-sm" type="button" onclick="toggleInstructivo()">
-                Ver instructivo
-            </button>
-            <button class="btn btn-primary btn-sm" type="button" onclick="generarPDF()">
-                <i class="bi bi-file-earmark-pdf-fill me-1"></i>Generar archivo PDF
-            </button>
-            <a href="/public/PDF/INSTRUCTIVO_PARA_LLENAR_EL_FORMATO.pdf" target="_blank"
-                class="btn btn-secondary btn-sm ">
-                <i class="bi bi-file-earmark-pdf-fill me-1"></i>Abrir instructivo en PDF
-            </a>
-        </div>
+  <div class="container mt-5 mb-2 no-print">
+    <div class="d-flex gap-2 justify-content-start mt-3">
+      <button id="btn-guardar" class="btn btn-success btn-sm">
+        <i class="bi bi-save me-1"></i>Guardar
+      </button>
+
+      <a id="btn-descargar-excel" class="btn btn-outline-success btn-sm disabled" href="#" role="button">
+        <i class="bi bi-file-earmark-excel me-1"></i>Descargar Excel
+      </a>
+
+      <a href="/public/PDF/INSTRUCTIVO_PARA_LLENAR_EL_FORMATO.pdf" target="_blank" class="btn btn-secondary btn-sm">
+        <i class="bi bi-file-earmark-pdf-fill me-1"></i>Abrir instructivo en PDF
+      </a>
+    </div>
+  </div>
+
+  <div class="form-container">
+    <div class="row mb-3">
+      <div class="col-3 text-center">
+        <span style="font-size:10px;">LOGO AYUNTAMIENTO</span>
+      </div>
+      <div class="col-6">
+        <div class="form-title">H. AYUNTAMIENTO DE ECATEPEC DE MORELOS</div>
+        <div class="sub-title">SUFICIENCIA PRESUPUESTAL - EJERCICIO FISCAL 2025</div>
+      </div>
+      <div class="col-3">
+        <table class="table table-bordered mb-0">
+          <tr><th class="table-header">No. de Suficiencia</th></tr>
+          <tr><td><input type="text" class="form-control form-control-sm" name="no_suficiencia"></td></tr>
+        </table>
+      </div>
     </div>
 
-    <div class="form-container">
+    <!-- Datos generales -->
+    <table class="table table-bordered mb-2">
+      <tr>
+        <th class="table-header" style="width:15%;">Fecha</th>
+        <td style="width:35%;"><input type="date" class="form-control form-control-sm" name="fecha"></td>
+        <th class="table-header" style="width:15%;">Dependencia / Unidad Responsable</th>
+        <td style="width:35%;"><input type="text" class="form-control form-control-sm" name="dependencia"></td>
+      </tr>
+      <tr>
+        <th class="table-header">Dirección / Departamento</th>
+        <td><input type="text" class="form-control form-control-sm" name="departamento"></td>
+        <th class="table-header">Programa</th>
+        <td><input type="text" class="form-control form-control-sm" name="programa"></td>
+      </tr>
+      <tr>
+        <th class="table-header">Proyecto</th>
+        <td><input type="text" class="form-control form-control-sm" name="proyecto"></td>
+        <th class="table-header">Fuente de Financiamiento</th>
+        <td><input type="text" class="form-control form-control-sm" name="fuente"></td>
+      </tr>
+      <tr>
+        <th class="table-header">Partida Presupuestal</th>
+        <td><input type="text" class="form-control form-control-sm" name="partida"></td>
+        <th class="table-header">Programación de pago</th>
+        <td>
+          <select class="form-select form-select-sm" name="mes_pago">
+            <option value="ENERO">ENERO</option>
+            <option value="FEBRERO">FEBRERO</option>
+            <option value="MARZO">MARZO</option>
+            <option value="ABRIL">ABRIL</option>
+            <option value="MAYO">MAYO</option>
+            <option value="JUNIO">JUNIO</option>
+            <option value="JULIO">JULIO</option>
+            <option value="AGOSTO">AGOSTO</option>
+            <option value="SEPTIEMBRE">SEPTIEMBRE</option>
+            <option value="OCTUBRE">OCTUBRE</option>
+            <option value="NOVIEMBRE">NOVIEMBRE</option>
+            <option value="DICIEMBRE">DICIEMBRE</option>
+          </select>
+        </td>
+      </tr>
+    </table>
 
-        <div class="row mb-3">
-            <div class="col-3 text-center">
-                <span style="font-size:10px;">LOGO AYUNTAMIENTO</span>
-            </div>
-            <div class="col-6">
-                <div class="form-title">
-                    H. AYUNTAMIENTO DE ECATEPEC DE MORELOS
-                </div>
-                <div class="sub-title">
-                    SUFICIENCIA PRESUPUESTAL - EJERCICIO FISCAL 2025
-                </div>
-            </div>
-            <div class="col-3">
-                <table class="table table-bordered mb-0">
-                    <tr>
-                        <th class="table-header">No. de Suficiencia</th>
-                    </tr>
-                    <tr>
-                        <td><input type="text" class="form-control form-control-sm" name="no_suficiencia"></td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-
-        <!-- Datos generales -->
-        <table class="table table-bordered mb-2">
-            <tr>
-                <th class="table-header" style="width: 15%;">Fecha</th>
-                <td style="width: 35%;">
-                    <input type="date" class="form-control form-control-sm" name="fecha">
-                </td>
-                <th class="table-header" style="width: 15%;">Dependencia / Unidad Responsable</th>
-                <td style="width: 35%;">
-                    <input type="text" class="form-control form-control-sm" name="dependencia">
-                </td>
-            </tr>
-            <tr>
-                <th class="table-header">Dirección / Departamento</th>
-                <td>
-                    <input type="text" class="form-control form-control-sm" name="departamento">
-                </td>
-                <th class="table-header">Programa</th>
-                <td>
-                    <input type="text" class="form-control form-control-sm" name="programa">
-                </td>
-            </tr>
-            <tr>
-                <th class="table-header">Proyecto</th>
-                <td>
-                    <input type="text" class="form-control form-control-sm" name="proyecto">
-                </td>
-                <th class="table-header">Fuente de Financiamiento</th>
-                <td>
-                    <input type="text" class="form-control form-control-sm" name="fuente">
-                </td>
-            </tr>
-            <tr>
-                <th class="table-header">Partida Presupuestal</th>
-                <td>
-                    <input type="text" class="form-control form-control-sm" name="partida">
-                </td>
-                <th class="table-header">Importe Solicitado</th>
-                <td>
-                    <input type="number" step="0.01" class="form-control form-control-sm text-end"
-                        name="importe_solicitado">
-                </td>
-            </tr>
-        </table>
-
-        <!-- Justificación -->
-        <div class="mb-2">
-            <label class="fw-bold" style="font-size: 11px;">Justificación:</label>
-            <textarea class="form-control form-control-sm" rows="3" name="justificacion"></textarea>
-        </div>
-
-        <!-- Detalle de bienes/servicios -->
-        <table class="table table-bordered mb-3">
-            <thead>
-                <tr>
-                    <th class="table-header" style="width: 5%;">No.</th>
-                    <th class="table-header" style="width: 15%;">Clave Presupuestal</th>
-                    <th class="table-header" style="width: 40%;">Descripción del bien o servicio</th>
-                    <th class="table-header" style="width: 10%;">Cantidad</th>
-                    <th class="table-header" style="width: 15%;">Costo unitario</th>
-                    <th class="table-header" style="width: 15%;">Importe</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Deja algunas filas fijas. Puedes copiar/pegar para tener más. -->
-                <tr>
-                    <td><input type="number" class="form-control form-control-sm" name="r1_no"></td>
-                    <td><input type="text" class="form-control form-control-sm" name="r1_clave"></td>
-                    <td><input type="text" class="form-control form-control-sm" name="r1_descripcion"></td>
-                    <td><input type="number" step="0.01" class="form-control form-control-sm text-end"
-                            name="r1_cantidad"></td>
-                    <td><input type="number" step="0.01" class="form-control form-control-sm text-end" name="r1_costo">
-                    </td>
-                    <td><input type="number" step="0.01" class="form-control form-control-sm text-end"
-                            name="r1_importe"></td>
-                </tr>
-                <tr>
-                    <td><input type="number" class="form-control form-control-sm" name="r2_no"></td>
-                    <td><input type="text" class="form-control form-control-sm" name="r2_clave"></td>
-                    <td><input type="text" class="form-control form-control-sm" name="r2_descripcion"></td>
-                    <td><input type="number" step="0.01" class="form-control form-control-sm text-end"
-                            name="r2_cantidad"></td>
-                    <td><input type="number" step="0.01" class="form-control form-control-sm text-end" name="r2_costo">
-                    </td>
-                    <td><input type="number" step="0.01" class="form-control form-control-sm text-end"
-                            name="r2_importe"></td>
-                </tr>
-                <tr>
-                    <td><input type="number" class="form-control form-control-sm" name="r3_no"></td>
-                    <td><input type="text" class="form-control form-control-sm" name="r3_clave"></td>
-                    <td><input type="text" class="form-control form-control-sm" name="r3_descripcion"></td>
-                    <td><input type="number" step="0.01" class="form-control form-control-sm text-end"
-                            name="r3_cantidad"></td>
-                    <td><input type="number" step="0.01" class="form-control form-control-sm text-end" name="r3_costo">
-                    </td>
-                    <td><input type="number" step="0.01" class="form-control form-control-sm text-end"
-                            name="r3_importe"></td>
-                </tr>
-                <!-- Agrega más filas si tu formato las tiene -->
-            </tbody>
-        </table>
-
-        <!-- Totales -->
-        <table class="table table-bordered mb-4">
-            <tr>
-                <th class="table-header" style="width: 85%;">Total</th>
-                <td style="width: 15%;">
-                    <input type="number" step="0.01" class="form-control form-control-sm text-end" name="total_general">
-                </td>
-            </tr>
-        </table>
-
-        <!-- Firmas -->
-        <div class="row mt-4">
-            <div class="col-4 firma">
-                <div class="firma-linea"></div>
-                <div>Elaboró</div>
-            </div>
-            <div class="col-4 firma">
-                <div class="firma-linea"></div>
-                <div>Revisó</div>
-            </div>
-            <div class="col-4 firma">
-                <div class="firma-linea"></div>
-                <div>Autorizó</div>
-            </div>
-        </div>
+    <!-- Justificación general -->
+    <div class="mb-2">
+      <label class="fw-bold" style="font-size: 11px;">Justificación (general):</label>
+      <textarea class="form-control form-control-sm" rows="3" name="justificacion_general"></textarea>
     </div>
 
-    <div id="instructivo" class="container mt-4 mb-4" style="display:none;">
-        <div class="form-container">
-            <h6 class="text-center mb-3">INSTRUCTIVO PARA LLENAR EL FORMATO: <br />
-                SOLICITUD DE SUFICIENCIA PRESUPUESTAL</h6>
-            <!-- Aquí pega el texto de la segunda hoja de tu Excel -->
-            <p style="font-size: 11px; text-align: justify;">
-                <strong>Objetivo</strong><br />
-                Mediante el presente formato de Solicitud de Suficiencia Presupuestal, se verifica la disponibilidad de
-                recursos financieros en la partida presupuestal correspondiente, con el fin de determinar la viabilidad
-                de afectación del presupuesto para atender un requerimiento específico, conforme al techo presupuestal
-                autorizado y a la normatividad vigente.<br /><br />
+   <!-- Detalle (dinámico) -->
+<div class="d-flex align-items-center justify-content-between mb-2">
+  <div class="fw-bold" style="font-size: 11px;">Detalle:</div>
 
-                <strong>Distribución y Destinatario</strong><br />
-                El formato de Solicitud de Suficiencia Presupuestal es elaborado por el Área Solicitante y entregado a
-                la Subdirección de Control y Registro Presupuestal para su análisis y validación.
+  <!-- botón + -->
+  <button id="btn-add-row" type="button" class="btn btn-sm btn-outline-primary">
+    <i class="bi bi-plus-lg"></i>
+  </button>
+</div>
 
-                <!-- Fin ejemplo -->
-            </p>
-        </div>
+<table class="table table-bordered mb-3">
+  <thead>
+    <tr>
+      <th class="table-header" style="width: 5%;">No.</th>
+      <th class="table-header" style="width: 12%;">Clave</th>
+      <th class="table-header" style="width: 20%;">Concepto de partida</th>
+      <th class="table-header" style="width: 20%;">Justificación</th>
+      <th class="table-header" style="width: 33%;">Descripción</th>
+      <th class="table-header" style="width: 10%;">Importe solicitado</th>
+    </tr>
+  </thead>
+
+  <tbody id="detalleBody">
+    <!-- JS inserta 3 filas al cargar -->
+  </tbody>
+</table>
+
+<!-- Totales -->
+<table class="table table-bordered mb-2">
+  <tr>
+    <th class="table-header text-center" style="width: 85%;">TOTAL:</th>
+    <td style="width: 15%;">
+      <input type="text" class="form-control form-control-sm text-end" name="total" value="0.00" readonly>
+
+    </td>
+  </tr>
+</table>
+
+<table class="table table-bordered mb-4">
+  <tr>
+    <th class="table-header" style="width: 15%;">CANTIDAD CON LETRA:</th>
+    <td style="width: 85%;">
+      <input type="text" class="form-control form-control-sm" name="cantidad_con_letra" readonly>
+
+    </td>
+  </tr>
+</table>
+
+    <!-- Leyenda (imagen 5) -->
+    <div class="border p-2" style="font-size:11px; text-align:justify;">
+      <p class="mb-2">
+        La presente suficiencia presupuestal únicamente acredita la disponibilidad de recursos en la(s) clave(s) indicada(s),
+        sin que ello implique autorización para realizar procesos de licitación, adjudicación, contratación, adquisición, pago
+        o validación documental, los cuales son responsabilidad exclusiva del ÁREA SOLICITANTE.
+      </p>
+      <p class="mb-2">
+        Esta autorización se emite con base en el techo presupuestal aprobado para la unidad administrativa correspondiente,
+        siendo también responsabilidad del ÁREA SOLICITANTE la planeación, administración, verificación y comprobación del uso de los recursos.
+      </p>
+      <p class="mb-2">
+        El ejercicio del gasto deberá apegarse a lo establecido en el Clasificador por Objeto del Gasto Estatal y Municipal,
+        incluido en el Manual para la Planeación, Programación y Presupuesto de Egresos Municipal vigente, en los Lineamientos Generales
+        para la Evaluación de Programas Presupuestarios Municipales, y en la normatividad municipal, estatal y complementaria aplicable.
+      </p>
+      <p class="mb-0">
+        El recurso deberá ejercerse en el mismo mes de emisión de esta suficiencia; en caso contrario, perderá validez y deberá tramitarse nuevamente con fecha del mes en curso.
+      </p>
     </div>
 
-    <script src="js/suficiencia_presupuestal.js"></script>
+    <!-- Firmas -->
+    <div class="row mt-4">
+      <div class="col-4 firma"><div class="firma-linea"></div><div>Elaboró</div></div>
+      <div class="col-4 firma"><div class="firma-linea"></div><div>Revisó</div></div>
+      <div class="col-4 firma"><div class="firma-linea"></div><div>Autorizó</div></div>
+    </div>
+  </div>
+
+  <!-- Modal confirmación -->
+  <div class="modal fade" id="modalConfirm" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Confirmación</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">¿Estás seguro de guardar la Suficiencia Presupuestal?</div>
+        <div class="modal-footer">
+          <button id="btn-no-seguro" type="button" class="btn btn-secondary" data-bs-dismiss="modal">No estoy seguro</button>
+          <button id="btn-si-seguro" type="button" class="btn btn-success">Sí, estoy seguro</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/suficiencia_presupuestal.js"></script>
+  <script src="js/script.js"></script>
+  <script src="js/partidas.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="js/user-info.js"></script>
 </body>
-
 </html>
