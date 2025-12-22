@@ -111,7 +111,6 @@
   }
 
   async function setDependenciaReadonly() {
-    // fuerza readonly visual y real
     const depEl = document.querySelector(`[name="dependencia"]`);
     if (depEl) depEl.readOnly = true;
 
@@ -139,8 +138,89 @@
       }
     }
 
-    // 3) fallback
     setVal("dependencia", "");
+  }
+
+  // ---------------------------
+  // Combos: Proyectos, Fuentes, Programas
+  // ---------------------------
+  function setOptions(selectName, items, getValue, getLabel) {
+    const sel = document.querySelector(`[name="${selectName}"]`);
+    if (!sel) return;
+
+    sel.innerHTML = `<option value="">-- Selecciona --</option>`;
+    for (const it of items || []) {
+      const opt = document.createElement("option");
+      opt.value = String(getValue(it) ?? "");
+      opt.textContent = String(getLabel(it) ?? "");
+      sel.appendChild(opt);
+    }
+  }
+
+  // 👉 OJO: ajusta esta ruta a la que uses en projects.html
+  async function loadProyectosProgramaticos() {
+  const user = getLoggedUser();
+
+  const roles = Array.isArray(user?.roles) ? user.roles : [];
+  const rolesNorm = roles.map(r => String(r).trim().toUpperCase());
+  const isArea = rolesNorm.includes("AREA");
+  const myIdDg = user?.id_dgeneral != null ? Number(user.id_dgeneral) : null;
+
+  // 👇 Esta es la misma ruta que usa projects.js
+  const data = await fetchJson(`${API}/api/projects`, {
+    headers: { ...authHeaders() },
+  });
+
+  let projects = Array.isArray(data) ? data : [];
+
+  // 🔒 mismo filtro que projects.js para usuarios AREA
+  if (isArea && myIdDg != null) {
+    projects = projects.filter(p => {
+      const projIdDg = p.id_dgeneral != null ? Number(p.id_dgeneral) : null;
+      return projIdDg === myIdDg;
+    });
+  }
+
+  // OJO: el campo se llama "project"
+  // value y label serán el mismo string L001...
+  setOptions(
+    "id_proyecto_programatico",
+    projects,
+    (p) => p.project,
+    (p) => p.project
+  );
+
+  console.log("[SP] proyectos cargados:", projects.length);
+}
+
+
+
+  async function loadFuentesCatalog() {
+    const data = await fetchJson(`${API}/api/catalogos/fuentes`, {
+      headers: { ...authHeaders() },
+    });
+
+    // Esperado: [{id, clave, fuente}]
+    setOptions(
+      "fuente",
+      data,
+      (x) => x.id,
+      (x) => `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`
+    );
+  }
+
+  async function loadProgramasCatalog() {
+    const data = await fetchJson(`${API}/api/catalogos/programas`, {
+      headers: { ...authHeaders() },
+    });
+
+    // Esperado: [{id, clave, descripcion}]
+    setOptions(
+      "programa",
+      data,
+      (x) => x.id,
+      (x) => `${String(x.clave ?? "").trim()} - ${String(x.descripcion ?? "").trim()}`
+    );
   }
 
   // ---------------------------
@@ -243,17 +323,15 @@
 
   // Listener: total + clave->concepto
   document.addEventListener("input", (e) => {
-    // total
     if (e.target && e.target.classList.contains("sp-importe")) {
       refreshTotalAndLetter();
       return;
     }
 
-    // clave (4 dígitos + concepto)
     if (e.target && e.target.classList.contains("sp-clave")) {
       e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4);
 
-      const name = e.target.getAttribute("name"); // r1_clave
+      const name = e.target.getAttribute("name");
       const match = name?.match(/^r(\d+)_clave$/);
       if (!match) return;
 
@@ -367,13 +445,12 @@
     return {
       fecha: get("fecha"),
       dependencia: get("dependencia"),
-      departamento: get("departamento"),
-      programa: get("programa"),
-      proyecto: get("proyecto"),
-      fuente: get("fuente"),
-      partida: get("partida"),
+
+      id_proyecto_programatico: get("id_proyecto_programatico"),
+      id_fuente: get("fuente"),
+      id_programa: get("programa"),
+
       mes_pago: get("mes_pago"),
-      justificacion_general: get("justificacion_general"),
       cantidad_con_letra: get("cantidad_con_letra"),
       total,
       detalle,
@@ -444,16 +521,22 @@
     refreshTotalAndLetter();
     bindEvents();
 
-    // ✅ dependencia readonly desde usuario
     try { await setDependenciaReadonly(); } catch (e) { console.warn("[SP] dependencia:", e.message); }
 
-    // backend opcional (no rompe filas)
     try { await loadPartidasCatalog(); } catch (e) { console.warn("[SP] catálogo partidas:", e.message); }
     try { await loadNextFolio(); } catch (e) { console.warn("[SP] folio:", e.message); }
+
+    // ✅ combos
+    try {
+  await loadProyectosProgramaticos();
+} catch (e) {
+  console.error("[SP] proyectos:", e.message);
+  alert("No se pudieron cargar los PROYECTOS. Revisa consola (F12) > Network/Console.");
+}
+    try { await loadFuentesCatalog(); } catch (e) { console.warn("[SP] fuentes:", e.message); }
+    try { await loadProgramasCatalog(); } catch (e) { console.warn("[SP] programas:", e.message); }
   }
 
-  // Si tu script está al final del body, DOM ya existe.
-  // Si no, esperamos DOMContentLoaded.
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
   } else {
