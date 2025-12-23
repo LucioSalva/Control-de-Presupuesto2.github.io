@@ -22,9 +22,6 @@ app.use(express.json());
 
 // =====================================================
 //  STATIC (FRONTEND)
-//  - server/public  => / (html como 404.html, imágenes, etc.)
-//  - /css           => carpeta raíz /css (afuera de /server)
-//  - /js (opcional) => carpeta raíz /js (afuera de /server)
 // =====================================================
 
 // Sirve HTML/archivos desde: server/public
@@ -57,11 +54,14 @@ function buildHttpError(message, statusCode = 400) {
   return err;
 }
 
+/**
+ * ✅ Auditoría: quién ejecuta la acción (viene del front en header)
+ * En el frontend manda: headers: { "x-user-id": <id del usuario logueado> }
+ */
 function getActorId(req) {
   const actorId = Number(req.headers["x-user-id"] || 0);
   return Number.isFinite(actorId) && actorId > 0 ? actorId : null;
 }
-
 
 /**
  * Valida que vengan id_dgeneral, id_dauxiliar, id_fuente
@@ -74,6 +74,8 @@ async function getProjectKeys({
   id_fuente,
 }) {
   const projectCode = String(id_proyecto || "").trim();
+
+  // NOTA: id_proyecto es string, los demás son enteros
   const dg = Number(id_dgeneral);
   const da = Number(id_dauxiliar);
   const fu = Number(id_fuente);
@@ -124,6 +126,7 @@ app.post("/api/login", async (req, res) => {
              u.correo,
              u.password,
              u.id_dgeneral,
+             u.id_dauxiliar,
              u.activo,
              d.clave AS dgeneral_clave,
              d.dependencia AS dgeneral_nombre,
@@ -157,7 +160,6 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ error: "Credenciales inválidas" });
     }
 
-    // Token "de mentiritas"
     const token = `token-${user.id}-${Date.now()}`;
 
     return res.json({
@@ -169,6 +171,7 @@ app.post("/api/login", async (req, res) => {
         correo: user.correo,
         roles: user.roles,
         id_dgeneral: user.id_dgeneral,
+        id_dauxiliar: user.id_dauxiliar,
         dgeneral_clave: user.dgeneral_clave,
         dgeneral_nombre: user.dgeneral_nombre,
       },
@@ -820,7 +823,7 @@ app.get("/api/check-recon-duplicates", async (req, res) => {
 });
 
 /* =====================================================
-   Catálogos para crear proyecto
+   Catálogos
    ===================================================== */
 app.get("/api/catalogos/dgeneral", async (_req, res) => {
   try {
@@ -848,9 +851,7 @@ app.get("/api/catalogos/dauxiliar", async (_req, res) => {
 
 app.get("/api/catalogos/fuentes", async (_req, res) => {
   try {
-    const r = await query(
-      `SELECT id, clave, fuente FROM fuentes ORDER BY clave`
-    );
+    const r = await query(`SELECT id, clave, fuente FROM fuentes ORDER BY clave`);
     res.json(r.rows);
   } catch (e) {
     console.error("GET /api/catalogos/fuentes", e);
@@ -882,10 +883,23 @@ app.get("/api/catalogos/proyectos", async (_req, res) => {
   }
 });
 
+app.get("/api/catalogos/partidas", async (_req, res) => {
+  try {
+    const r = await query(`
+      SELECT id, clave, descripcion
+      FROM partidas
+      ORDER BY clave
+    `);
+    res.json(r.rows);
+  } catch (e) {
+    console.error("GET /api/catalogos/partidas", e);
+    res.status(500).json({ error: "Error obteniendo catálogo partidas" });
+  }
+});
+
 /* =====================================================
    SUFICIENCIA PRESUPUESTAL
    ===================================================== */
-
 app.post("/api/suficiencias", async (req, res) => {
   const {
     fecha,
@@ -911,8 +925,6 @@ app.post("/api/suficiencias", async (req, res) => {
   const client = await getClient();
   try {
     await client.query("BEGIN");
-
-    // Evita duplicados de folio por concurrencia
     await client.query("LOCK TABLE suficiencias IN EXCLUSIVE MODE");
 
     const folioQ = await client.query(`
@@ -921,7 +933,6 @@ app.post("/api/suficiencias", async (req, res) => {
     `);
     const folio_num = Number(folioQ.rows[0].folio_num);
 
-    // INSERT cabecera (ajusta nombres de columnas si difieren)
     const insCab = await client.query(
       `
       INSERT INTO suficiencias (
@@ -959,8 +970,6 @@ app.post("/api/suficiencias", async (req, res) => {
 
     const id = insCab.rows[0].id;
 
-    // INSERT detalle
-    // Ajusta nombres de columnas si tu tabla "suficiencia_detalle" difiere
     for (let idx = 0; idx < detalle.length; idx++) {
       const r = detalle[idx] || {};
       const no = idx + 1;
@@ -1002,13 +1011,13 @@ app.post("/api/suficiencias", async (req, res) => {
 });
 
 /* =====================================================
-   ADMINISTRACIÓN DE USUARIOS (CRUD)
+   ADMINISTRACIÓN DE USUARIOS (CRUD) ✅ Auditoría
    ===================================================== */
 
-// LISTA completa (única versión)
+// LISTA completa
 app.get("/api/admin/usuarios", async (_req, res) => {
   try {
-        const sql = `
+    const sql = `
       SELECT
         u.id,
         u.nombre_completo,
@@ -1017,17 +1026,17 @@ app.get("/api/admin/usuarios", async (_req, res) => {
         u.activo,
         u.fecha_creacion,
 
-        -- Dependencia general
         u.id_dgeneral,
         dg.clave AS dgeneral_clave,
         dg.dependencia AS dgeneral_nombre,
 
-        -- Dependencia auxiliar ✅
         u.id_dauxiliar,
         da.clave AS dauxiliar_clave,
         da.dependencia AS dauxiliar_nombre,
 
-        -- Roles (igual que login, pero en lista) ✅
+        u.updated_by,
+        u.updated_at,
+
         COALESCE(
           ARRAY_AGG(DISTINCT r.clave) FILTER (WHERE r.clave IS NOT NULL),
           '{}'::text[]
@@ -1049,7 +1058,6 @@ app.get("/api/admin/usuarios", async (_req, res) => {
       ORDER BY u.id;
     `;
 
-
     const result = await query(sql);
     res.json(result.rows);
   } catch (err) {
@@ -1058,6 +1066,7 @@ app.get("/api/admin/usuarios", async (_req, res) => {
   }
 });
 
+// CREAR usuario ✅ updated_by/updated_at
 app.post("/api/admin/usuarios", async (req, res) => {
   const {
     nombre_completo,
@@ -1065,41 +1074,10 @@ app.post("/api/admin/usuarios", async (req, res) => {
     correo,
     password,
     id_dgeneral,
-    id_dauxiliar, // ✅ NUEVO
+    id_dauxiliar,
     activo = true,
     roles = [],
   } = req.body;
-
-  const actorId = getActorId(req);
-
-await client.query(
-  `
-  UPDATE usuarios
-     SET nombre_completo = $1,
-         usuario         = $2,
-         correo          = $3,
-         password        = $4,
-         id_dgeneral     = $5,
-         id_dauxiliar    = $6,
-         activo          = $7,
-         updated_by      = $8,
-         updated_at      = NOW()
-   WHERE id = $9;
-  `,
-  [
-    nombre_completo,
-    usuario,
-    correo || null,
-    password,
-    id_dgeneral || null,
-    id_dauxiliar || null,
-    !!activo,
-    actorId, // ✅ quien modificó
-    id,
-  ]
-);
-
-
 
   if (!nombre_completo || !usuario || !password) {
     return res.status(400).json({
@@ -1116,32 +1094,30 @@ await client.query(
     const ins = await client.query(
       `
       INSERT INTO usuarios (
-    nombre_completo,
-    usuario,
-    correo,
-    password,
-    id_dgeneral,
-    id_dauxiliar,
-    activo,
-    updated_by,
-    updated_at
-  )
-  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
-  RETURNING id;
-  `,
-  [
-    nombre_completo,
-    usuario,
-    correo || null,
-    password,
-    id_dgeneral || null,
-    id_dauxiliar || null,
-    !!activo,
-    actorId, // ✅ quien lo creó
-  ]
-);
-
-
+        nombre_completo,
+        usuario,
+        correo,
+        password,
+        id_dgeneral,
+        id_dauxiliar,
+        activo,
+        updated_by,
+        updated_at
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
+      RETURNING id;
+      `,
+      [
+        nombre_completo,
+        usuario,
+        correo || null,
+        password,
+        id_dgeneral || null,
+        id_dauxiliar || null,
+        !!activo,
+        actorId,
+      ]
+    );
 
     const newId = ins.rows[0].id;
 
@@ -1186,7 +1162,7 @@ await client.query(
   }
 });
 
-
+// ACTUALIZAR usuario ✅ updated_by/updated_at
 app.put("/api/admin/usuarios/:id", async (req, res) => {
   const id = Number(req.params.id || 0);
   if (!id) return res.status(400).json({ error: "ID inválido" });
@@ -1197,20 +1173,22 @@ app.put("/api/admin/usuarios/:id", async (req, res) => {
     correo,
     password,
     id_dgeneral,
-    id_dauxiliar, // ✅ NUEVO
+    id_dauxiliar,
     activo = true,
     roles = [],
   } = req.body;
 
   if (!nombre_completo || !usuario) {
-    return res.status(400).json({
-      error: "Nombre completo y usuario son obligatorios",
-    });
+    return res
+      .status(400)
+      .json({ error: "Nombre completo y usuario son obligatorios" });
   }
 
   const client = await getClient();
   try {
     await client.query("BEGIN");
+
+    const actorId = getActorId(req);
 
     if (password && password.trim().length > 0) {
       await client.query(
@@ -1222,8 +1200,10 @@ app.put("/api/admin/usuarios/:id", async (req, res) => {
                password        = $4,
                id_dgeneral     = $5,
                id_dauxiliar    = $6,
-               activo          = $7
-         WHERE id = $8;
+               activo          = $7,
+               updated_by      = $8,
+               updated_at      = NOW()
+         WHERE id = $9;
         `,
         [
           nombre_completo,
@@ -1233,6 +1213,7 @@ app.put("/api/admin/usuarios/:id", async (req, res) => {
           id_dgeneral || null,
           id_dauxiliar || null,
           !!activo,
+          actorId,
           id,
         ]
       );
@@ -1245,8 +1226,10 @@ app.put("/api/admin/usuarios/:id", async (req, res) => {
                correo          = $3,
                id_dgeneral     = $4,
                id_dauxiliar    = $5,
-               activo          = $6
-         WHERE id = $7;
+               activo          = $6,
+               updated_by      = $7,
+               updated_at      = NOW()
+         WHERE id = $8;
         `,
         [
           nombre_completo,
@@ -1255,6 +1238,7 @@ app.put("/api/admin/usuarios/:id", async (req, res) => {
           id_dgeneral || null,
           id_dauxiliar || null,
           !!activo,
+          actorId,
           id,
         ]
       );
@@ -1301,6 +1285,7 @@ app.put("/api/admin/usuarios/:id", async (req, res) => {
   }
 });
 
+// ELIMINAR usuario ✅ guarda updated_by/updated_at antes del DELETE
 app.delete("/api/admin/usuarios/:id", async (req, res) => {
   const id = Number(req.params.id || 0);
   if (!id) return res.status(400).json({ error: "ID inválido" });
@@ -1308,8 +1293,21 @@ app.delete("/api/admin/usuarios/:id", async (req, res) => {
   const client = await getClient();
   try {
     await client.query("BEGIN");
+
+    const actorId = getActorId(req);
+
+    // ✅ importante: para que el trigger capture actor antes del delete
+    await client.query(
+      `UPDATE public.usuarios
+          SET updated_by = $1,
+              updated_at = NOW()
+        WHERE id = $2`,
+      [actorId, id]
+    );
+
     await client.query("DELETE FROM usuario_rol WHERE id_usuario = $1", [id]);
     await client.query("DELETE FROM usuarios WHERE id = $1", [id]);
+
     await client.query("COMMIT");
     res.json({ ok: true });
   } catch (e) {
@@ -1321,23 +1319,8 @@ app.delete("/api/admin/usuarios/:id", async (req, res) => {
   }
 });
 
-app.get("/api/catalogos/partidas", async (_req, res) => {
-  try {
-    const r = await query(`
-      SELECT id, clave, descripcion
-      FROM partidas
-      ORDER BY clave
-    `);
-    res.json(r.rows);
-  } catch (e) {
-    console.error("GET /api/catalogos/partidas", e);
-    res.status(500).json({ error: "Error obteniendo catálogo partidas" });
-  }
-});
-
 /* =====================================================
    404 — RUTAS NO ENCONTRADAS
-   (DEBE ir ANTES del app.listen)
    ===================================================== */
 app.use((req, res) => {
   if (req.originalUrl.startsWith("/api/")) {
