@@ -13,6 +13,8 @@ import adminUsuariosRouter from "./routes/admin-usuarios.routes.js";
 import authRouter from "./routes/auth.routes.js";
 import suficienciasRouter from "./routes/suficiencias.routes.js";
 import presupuestoRouter from "./routes/presupuesto.routes.js";
+import comprometidoRouter from "./routes/comprometido.routes.js";
+
 
 dotenv.config();
 
@@ -56,8 +58,13 @@ app.use("/api", authRouter);
 // Suficiencias
 app.use("/api/suficiencias", suficienciasRouter);
 
+// Comprometido (solo lectura)
+app.use("/api/comprometido", comprometidoRouter);
+
 // Presupuesto / detalles / gastos / reconducir / projects / etc.
 app.use("/api", presupuestoRouter);
+
+
 
 // =====================================================
 //  HELPERS 

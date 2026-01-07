@@ -157,16 +157,19 @@ body {
 
 .form-title {
   text-align: center;
-  font-weight: bold;
+  font-weight: 800;
   text-transform: uppercase;
   font-size: 14px;
+  letter-spacing: 0.3px;
 }
 
 .sub-title {
   text-align: center;
   font-size: 12px;
+  font-weight: 600;
 }
 
+/* Tablas del formato */
 .table-bordered td,
 .table-bordered th {
   border: 1px solid #000 !important;
@@ -174,10 +177,11 @@ body {
 
 .table-header {
   background-color: #e9ecef;
-  font-weight: bold;
+  font-weight: 800;
   text-align: center;
 }
 
+/* Firma */
 .firma {
   text-align: center;
   padding-top: 50px;
@@ -191,7 +195,92 @@ body {
 }
 
 /* =========================
-   IMPRESIÓN (PDF)
+   INPUTS "COMO TEXTO" (NO FORMULARIO)
+   ========================= */
+
+/* Reglas base: que NO parezca input editable */
+.form-container .as-text,
+.form-container .as-text:read-only,
+.form-container .ro,
+.form-container .ro:read-only {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  color: #000 !important;
+  opacity: 1 !important;
+  cursor: default !important;
+}
+
+/* Evita el borde azul al enfocar */
+.form-container .as-text:focus,
+.form-container .ro:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Texto institucional (más grueso, más limpio) */
+.td-text {
+  font-weight: 800 !important;
+  letter-spacing: 0.25px;
+  line-height: 1.15 !important;
+}
+
+/* Campo en TD: centrado vertical + horizontal REAL */
+td .as-text,
+td .ro {
+  display: flex !important;
+  align-items: center !important; /* centro vertical */
+  justify-content: center !important; /* centro horizontal */
+  width: 100%;
+  height: 100%;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+/* Si es text-end, respeta derecha (TOTAL, SUBTOTAL, etc.) */
+td .text-end.as-text,
+td .text-end.ro {
+  justify-content: flex-end !important;
+}
+
+/* Para folio */
+.ro-folio {
+  font-size: 14px;
+  font-weight: 900 !important;
+  letter-spacing: 1px;
+}
+
+/* Bloqueo visual: no selección ni click */
+.input-no-click {
+  pointer-events: none !important;
+  user-select: none !important;
+}
+
+/* En date, quita el icono/calendario (Chrome/Edge) */
+input[type="date"].as-text::-webkit-calendar-picker-indicator {
+  opacity: 0;
+  display: none;
+}
+input[type="date"].as-text::-webkit-inner-spin-button {
+  display: none;
+}
+
+/* =========================
+   (OPCIONAL) CAMPOS EDITABLES: más "oficial"
+   ========================= */
+.form-container input.form-control:not(.as-text):not(.ro),
+.form-container select.form-select:not(.as-text) {
+  border: 1px solid #b9b9b9;
+}
+.form-container input.form-control:not(.as-text):focus,
+.form-container select.form-select:not(.as-text):focus {
+  box-shadow: none;
+  border-color: #691c32;
+}
+
+/* =========================
+   IMPRESIÓN
    ========================= */
 @media print {
   body {
@@ -252,35 +341,4 @@ body {
   .navbar-light {
     top: 100px;
   }
-}
-
-
-/* =========================
-   READONLY: que NO parezca input editable
-   ========================= */
-.form-container .form-control.ro[readonly],
-.form-container .form-control.ro:read-only {
-  background: transparent !important;   /* sin fondo blanco */
-  border: none !important;             /* sin borde */
-  box-shadow: none !important;         /* sin sombra */
-  padding-left: 0 !important;          /* que parezca texto */
-  padding-right: 0 !important;
-  color: #000 !important;
-  font-weight: 700;                    /* resalta */
-  cursor: default;                     /* no cursor de texto */
-}
-
-/* Si quieres mantener alineación derecha en total */
-.form-container .form-control.ro.text-end[readonly],
-.form-container .form-control.ro.text-end:read-only {
-  padding-right: 0 !important;
-}
-
-/* Opcional: desactiva selección para que se sienta "etiqueta" */
-.form-container .form-control.ro[readonly] {
-  user-select: none;
-}
-.form-container .ro-folio[readonly] {
-  font-size: 14px;
-  letter-spacing: 1px;
 }

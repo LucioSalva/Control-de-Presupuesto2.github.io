@@ -12,11 +12,11 @@
   const btnSi = document.getElementById("btn-si-seguro");
   const btnDescargarExcel = document.getElementById("btn-descargar-excel");
   const btnDescargarPdf = document.getElementById("btn-descargar-pdf");
+  const btnVerComprometido = document.getElementById("btn-ver-comprometido");
 
   const btnAddRow = document.getElementById("btn-add-row");
-  const detalleBody = document.getElementById("detalleBody");
   const btnRemoveRow = document.getElementById("btn-remove-row");
-
+  const detalleBody = document.getElementById("detalleBody");
 
   const modalEl = document.getElementById("modalConfirm");
   const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
@@ -24,7 +24,7 @@
   let lastSavedId = null;
 
   // ---------------------------
-  // AUTH  ✅ (incluye cp_token)
+  // AUTH ✅ (incluye cp_token)
   // ---------------------------
   const getToken = () =>
     localStorage.getItem("cp_token") ||
@@ -86,6 +86,23 @@
     const mm = String(hoy.getMonth() + 1).padStart(2, "0");
     const dd = String(hoy.getDate()).padStart(2, "0");
     el.value = `${yyyy}-${mm}-${dd}`;
+  }
+
+  // ---------------------------
+  // (UI) Cantidad pago: SOLO lectura (se llena con TOTAL)
+  // ---------------------------
+  function lockCantidadPago() {
+    const cantEl = document.querySelector('[name="cantidad_pago"]');
+    if (!cantEl) return;
+
+    cantEl.readOnly = true;
+    cantEl.tabIndex = -1; // no focus con tab
+    cantEl.style.pointerEvents = "none"; // no click
+    cantEl.style.userSelect = "none"; // no selección
+
+    // ✅ usa tus clases reales (como en dependencia/fecha)
+    cantEl.classList.add("as-text", "td-text", "text-strong", "text-end");
+    cantEl.classList.add("input-no-click"); // por si ya tienes css
   }
 
   // ---------------------------
@@ -225,7 +242,9 @@
       data,
       (x) => x.id,
       (x) =>
-        `${String(x.clave ?? "").trim()} - ${String(x.descripcion ?? "").trim()}`
+        `${String(x.clave ?? "").trim()} - ${String(
+          x.descripcion ?? ""
+        ).trim()}`
     );
   }
 
@@ -289,48 +308,45 @@
     detalleBody.insertAdjacentHTML("beforeend", rowTemplate(next));
     refreshTotales();
   }
+
   function renumberRows() {
-  const rows = detalleBody ? Array.from(detalleBody.querySelectorAll("tr")) : [];
-  rows.forEach((tr, idx) => {
-    const i = idx + 1;
-    tr.setAttribute("data-row", String(i));
+    const rows = detalleBody
+      ? Array.from(detalleBody.querySelectorAll("tr"))
+      : [];
+    rows.forEach((tr, idx) => {
+      const i = idx + 1;
+      tr.setAttribute("data-row", String(i));
 
-    // actualiza el No. visible
-    const noInput = tr.querySelector('td:first-child input');
-    if (noInput) noInput.value = String(i);
+      const noInput = tr.querySelector("td:first-child input");
+      if (noInput) noInput.value = String(i);
 
-    // actualiza names de inputs de la fila
-    const clave = tr.querySelector(".sp-clave");
-    const concepto = tr.querySelector(`[name^="r"][name$="_concepto"]`);
-    const just = tr.querySelector(`[name^="r"][name$="_justificacion"]`);
-    const desc = tr.querySelector(`[name^="r"][name$="_descripcion"]`);
-    const imp = tr.querySelector(".sp-importe");
+      const clave = tr.querySelector(".sp-clave");
+      const concepto = tr.querySelector(`[name^="r"][name$="_concepto"]`);
+      const just = tr.querySelector(`[name^="r"][name$="_justificacion"]`);
+      const desc = tr.querySelector(`[name^="r"][name$="_descripcion"]`);
+      const imp = tr.querySelector(".sp-importe");
 
-    if (clave) clave.name = `r${i}_clave`;
-    if (concepto) concepto.name = `r${i}_concepto`;
-    if (just) just.name = `r${i}_justificacion`;
-    if (desc) desc.name = `r${i}_descripcion`;
-    if (imp) imp.name = `r${i}_importe`;
-  });
-}
-
-function removeRow() {
-  if (!detalleBody) return;
-
-  const n = rowCount();
-  if (n <= START_ROWS) {
-    alert(`Debes dejar mínimo ${START_ROWS} filas.`);
-    return;
+      if (clave) clave.name = `r${i}_clave`;
+      if (concepto) concepto.name = `r${i}_concepto`;
+      if (just) just.name = `r${i}_justificacion`;
+      if (desc) desc.name = `r${i}_descripcion`;
+      if (imp) imp.name = `r${i}_importe`;
+    });
   }
 
-  // quita la última fila
-  detalleBody.lastElementChild?.remove();
+  function removeRow() {
+    if (!detalleBody) return;
 
-  // renumera para que buildDetalle no se rompa
-  renumberRows();
-  refreshTotales();
-}
+    const n = rowCount();
+    if (n <= START_ROWS) {
+      alert(`Debes dejar mínimo ${START_ROWS} filas.`);
+      return;
+    }
 
+    detalleBody.lastElementChild?.remove();
+    renumberRows();
+    refreshTotales();
+  }
 
   function initRows() {
     if (!detalleBody) return;
@@ -400,6 +416,9 @@ function removeRow() {
     setVal("isr", isr.toFixed(2));
     setVal("total", total.toFixed(2));
 
+    // ✅ cantidad_pago = total (no editable)
+    setVal("cantidad_pago", total.toFixed(2));
+
     setVal("cantidad_con_letra", numeroALetrasMX(total));
   }
 
@@ -409,12 +428,6 @@ function removeRow() {
       refreshTotales();
       return;
     }
-
-    // ✅ Solo números en cantidad_pago
-  if (e.target && e.target.name === "cantidad_pago") {
-    e.target.value = e.target.value.replace(/\D/g, "");
-    return;
-  }
 
     if (e.target && e.target.classList.contains("sp-clave")) {
       e.target.value = e.target.value.replace(/\D/g, "").slice(0, 4);
@@ -439,6 +452,13 @@ function removeRow() {
     }
   });
 
+  // Si cambian mes/combos, recalcula (para que cantidad_pago siempre esté bien)
+  document.addEventListener("change", (e) => {
+    if (e.target && e.target.name === "mes_pago") {
+      refreshTotales();
+    }
+  });
+
   // ---------------------------
   // Número a letras (MXN)
   // ---------------------------
@@ -457,10 +477,54 @@ function removeRow() {
     if (num === 0) return "CERO";
     if (num < 0) return "MENOS " + numeroALetras(Math.abs(num));
 
-    const unidades = ["", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"];
-    const decenas10 = ["DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE", "DIECISÉIS", "DIECISIETE", "DIECIOCHO", "DIECINUEVE"];
-    const decenas = ["", "", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"];
-    const centenas = ["", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"];
+    const unidades = [
+      "",
+      "UNO",
+      "DOS",
+      "TRES",
+      "CUATRO",
+      "CINCO",
+      "SEIS",
+      "SIETE",
+      "OCHO",
+      "NUEVE",
+    ];
+    const decenas10 = [
+      "DIEZ",
+      "ONCE",
+      "DOCE",
+      "TRECE",
+      "CATORCE",
+      "QUINCE",
+      "DIECISÉIS",
+      "DIECISIETE",
+      "DIECIOCHO",
+      "DIECINUEVE",
+    ];
+    const decenas = [
+      "",
+      "",
+      "VEINTE",
+      "TREINTA",
+      "CUARENTA",
+      "CINCUENTA",
+      "SESENTA",
+      "SETENTA",
+      "OCHENTA",
+      "NOVENTA",
+    ];
+    const centenas = [
+      "",
+      "CIENTO",
+      "DOSCIENTOS",
+      "TRESCIENTOS",
+      "CUATROCIENTOS",
+      "QUINIENTOS",
+      "SEISCIENTOS",
+      "SETECIENTOS",
+      "OCHOCIENTOS",
+      "NOVECIENTOS",
+    ];
 
     function seccion(n) {
       if (n === 0) return "";
@@ -539,7 +603,6 @@ function removeRow() {
     });
 
     isrSel?.addEventListener("change", refreshTotales);
-
     if (isrSel) isrSel.disabled = getImpuestoTipo() !== "ISR";
   }
 
@@ -566,9 +629,7 @@ function removeRow() {
       id_programa: get("programa"),
 
       mes_pago: get("mes_pago"),
-
       cantidad_pago: get("cantidad_pago"),
-
 
       impuesto_tipo,
       isr_tasa,
@@ -598,6 +659,25 @@ function removeRow() {
 
     lastSavedId = data.id;
 
+    if (btnVerComprometido && lastSavedId) {
+      btnVerComprometido.disabled = false;
+      btnVerComprometido.dataset.id = String(lastSavedId);
+    }
+    try {
+      const payload = buildPayload();
+      localStorage.setItem(
+        "cp_last_suficiencia",
+        JSON.stringify({
+          id: data.id,
+          folio_num: data.folio_num,
+          saved_at: new Date().toISOString(),
+          payload, // lo que capturaste en suficiencia
+        })
+      );
+    } catch (e) {
+      console.warn("[SP] No se pudo guardar cp_last_suficiencia:", e);
+    }
+
     if (data.folio_num != null) {
       setVal("no_suficiencia", String(data.folio_num).padStart(6, "0"));
     }
@@ -620,7 +700,6 @@ function removeRow() {
   }
 
   function splitFechaParts(fechaStr) {
-    // yyyy-mm-dd
     const s = String(fechaStr || "").trim();
     const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (!m) return { d: "", m: "", y: "" };
@@ -628,7 +707,6 @@ function removeRow() {
   }
 
   function detalleToLines(detalle) {
-    // Regresa columnas como texto multilinea (para tus campos "No", "CLAVE", etc.)
     const rows = (detalle || []).filter((r) => {
       const hasAny =
         String(r.clave || "").trim() ||
@@ -659,16 +737,16 @@ function removeRow() {
       No: colNo.join("\n"),
       CLAVE: colClave.join("\n"),
       "CONCEPTO DE PARTIDA": colConcepto.join("\n"),
-      "JUSTIFICACIÓN": colJust.join("\n"),
-      "DESCRIPCIÓN": colDesc.join("\n"),
+      JUSTIFICACIÓN: colJust.join("\n"),
+      DESCRIPCIÓN: colDesc.join("\n"),
       IMPORTE: colImporte.join("\n"),
     };
   }
 
   async function fetchPdfTemplateBytes() {
     const candidates = [
-      "./public/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf", // VSCode Live Server
-      "./PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf",        // Express static /public
+      "./public/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf",
+      "./PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf",
       "/public/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf",
       "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf",
     ];
@@ -680,7 +758,6 @@ function removeRow() {
         const r = await fetch(url, { cache: "no-store" });
         const buf = await r.arrayBuffer();
 
-        // Validación rápida: header %PDF
         const head = new Uint8Array(buf.slice(0, 5));
         const headStr = String.fromCharCode(...head);
         if (!headStr.startsWith("%PDF")) {
@@ -700,7 +777,7 @@ function removeRow() {
       refreshTotales();
 
       if (!window.PDFLib?.PDFDocument) {
-        alert("Falta pdf-lib. Agrega el script de pdf-lib antes del módulo.");
+        alert("Falta pdf-lib. OJO: carga pdf-lib ANTES del script module.");
         return;
       }
 
@@ -708,20 +785,15 @@ function removeRow() {
       const detalle = buildDetalle();
       const { d, m, y } = splitFechaParts(payload.fecha);
 
-      // textos de combos
-      const proyectoTxt = getSelectedText("id_proyecto_programatico") || payload.id_proyecto_programatico;
-      const fuenteTxt = getSelectedText("fuente") || String(payload.id_fuente || "");
-      const programaTxt = getSelectedText("programa") || String(payload.id_programa || "");
+      const proyectoTxt =
+        getSelectedText("id_proyecto_programatico") ||
+        payload.id_proyecto_programatico;
+      const fuenteTxt =
+        getSelectedText("fuente") || String(payload.id_fuente || "");
+      const programaTxt =
+        getSelectedText("programa") || String(payload.id_programa || "");
 
-      // columnas detalle multilinea
       const cols = detalleToLines(detalle);
-
-      // Mes pago: tu PDF tiene campos por mes (ENERO...DICIEMBRE)
-      const mesSel = String(payload.mes_pago || "").trim().toUpperCase();
-      const meses = [
-        "ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
-        "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"
-      ];
 
       const templateBytes = await fetchPdfTemplateBytes();
       const pdfDoc = await PDFLib.PDFDocument.load(templateBytes);
@@ -731,31 +803,50 @@ function removeRow() {
         try {
           const f = form.getTextField(fieldName);
           f.setText(String(value ?? ""));
-        } catch {
-          // si no existe el campo, no truena
-        }
+        } catch {}
       };
 
-      // ====== CABECERA (según tus nombres de fields del PDF) ======
-      setTextSafe("NOMBRE DE LA DEPENDENCIA GENERAL:", payload.dependencia || "");
+      // ====== CABECERA ======
+      setTextSafe(
+        "NOMBRE DE LA DEPENDENCIA GENERAL:",
+        payload.dependencia || ""
+      );
       setTextSafe("CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", proyectoTxt || "");
       setTextSafe("FUENTE DE FINANCIAMIENTO", fuenteTxt || "");
-      setTextSafe("NOMBRE F.F", programaTxt || ""); // si aquí quieres otra cosa, cámbialo
+      setTextSafe("NOMBRE F.F", programaTxt || "");
 
-      // fecha en 3 campos
       setTextSafe("fechadia", d);
       setTextSafe("fechames", m);
       setTextSafe("fechayear", y);
 
-      // ====== PROGRAMACIÓN DE PAGO (marca solo el mes elegido) ======
-      for (const mes of meses) {
-        // tus nombres en PDF se ven como "ENEROPROGRAMACIÓN DE PAGO", etc.
-        const fname = `${mes}PROGRAMACIÓN DE PAGO`;
-        setTextSafe(fname, mes === mesSel ? "X" : "");
-      }
-      setTextSafe("CANTIDAD", String(payload.cantidad_pago || ""));
+      // ====== PROGRAMACIÓN DE PAGO ======
+      // ✅ En el mes seleccionado se escribe el TOTAL (sin "X")
+      const mesSel = String(payload.mes_pago || "")
+        .trim()
+        .toUpperCase();
+      const totalTxt = safeNumber(payload.total).toFixed(2);
 
-      // ====== DETALLE (tus campos grandes) ======
+      const meses = [
+        "ENERO",
+        "FEBRERO",
+        "MARZO",
+        "ABRIL",
+        "MAYO",
+        "JUNIO",
+        "JULIO",
+        "AGOSTO",
+        "SEPTIEMBRE",
+        "OCTUBRE",
+        "NOVIEMBRE",
+        "DICIEMBRE",
+      ];
+
+      for (const mes of meses) {
+        const fname = `${mes}PROGRAMACIÓN DE PAGO`;
+        setTextSafe(fname, mes === mesSel ? totalTxt : "");
+      }
+
+      // ====== DETALLE ======
       setTextSafe("No", cols.No);
       setTextSafe("CLAVE", cols.CLAVE);
       setTextSafe("CONCEPTO DE PARTIDA", cols["CONCEPTO DE PARTIDA"]);
@@ -772,12 +863,7 @@ function removeRow() {
       setTextSafe("CANTIDAD CON LETRA:", payload.cantidad_con_letra || "");
       setTextSafe("Meta", payload.meta || "");
 
-      // ====== FIRMAS (si quieres rellenarlas desde tu HTML, aquí mismo) ======
-      // setTextSafe("COORDINACIÓN ADMINISTRATIVA DEL ÁREA SOLICITANT", "...");
-      // setTextSafe("ÁREA SOLICITANTE", "...");
-      // setTextSafe("DIRECCIÓN SOLICITANTE", "...");
-
-      // Si quieres que ya NO se edite, aplana el formulario:
+      // ✅ aplana para que NO se vea editable en el PDF
       form.flatten();
 
       const outBytes = await pdfDoc.save();
@@ -803,7 +889,8 @@ function removeRow() {
   // Eventos
   // ---------------------------
   function bindEvents() {
-    if (btnAddRow) btnAddRow.addEventListener("click", addRow);
+    btnAddRow?.addEventListener("click", addRow);
+    btnRemoveRow?.addEventListener("click", removeRow);
 
     btnGuardar?.addEventListener("click", (e) => {
       e.preventDefault();
@@ -822,12 +909,20 @@ function removeRow() {
       }
     });
 
-    // ✅ Descargar PDF
     btnDescargarPdf?.addEventListener("click", (e) => {
       e.preventDefault();
       generarPDF();
     });
-    btnRemoveRow?.addEventListener("click", removeRow);
+
+    btnVerComprometido?.addEventListener("click", (e) => {
+      e.preventDefault();
+      const id = btnVerComprometido.dataset.id || lastSavedId;
+      if (!id) {
+        alert("Primero guarda la Suficiencia para generar el Comprometido.");
+        return;
+      }
+      window.open(`comprometido.html?id=${encodeURIComponent(id)}`, "_blank");
+    });
 
     bindTaxEvents();
   }
@@ -842,21 +937,55 @@ function removeRow() {
     }
 
     setFechaHoy();
+    lockCantidadPago();
 
     initRows();
     bindEvents();
 
-    try { await setDependenciaReadonly(); } catch (e) { console.warn("[SP] dependencia:", e.message); }
-    try { await loadPartidasCatalog(); } catch (e) { console.warn("[SP] catálogo partidas:", e.message); }
-    try { await loadNextFolio(); } catch (e) { console.warn("[SP] folio:", e.message); }
+    try {
+      await setDependenciaReadonly();
+    } catch (e) {
+      console.warn("[SP] dependencia:", e.message);
+    }
+    try {
+      await loadPartidasCatalog();
+    } catch (e) {
+      console.warn("[SP] catálogo partidas:", e.message);
+    }
+    try {
+      await loadNextFolio();
+    } catch (e) {
+      console.warn("[SP] folio:", e.message);
+    }
 
-    try { await loadProyectosProgramaticos(); } catch (e) {
+    try {
+      await loadProyectosProgramaticos();
+    } catch (e) {
       console.error("[SP] proyectos:", e.message);
       alert("No se pudieron cargar los PROYECTOS. Revisa consola (F12).");
     }
 
-    try { await loadFuentesCatalog(); } catch (e) { console.warn("[SP] fuentes:", e.message); }
-    try { await loadProgramasCatalog(); } catch (e) { console.warn("[SP] programas:", e.message); }
+    try {
+      await loadFuentesCatalog();
+    } catch (e) {
+      console.warn("[SP] fuentes:", e.message);
+    }
+    try {
+      await loadProgramasCatalog();
+    } catch (e) {
+      console.warn("[SP] programas:", e.message);
+    }
+
+    // ✅ Si hay último guardado, habilita botón al entrar
+    try {
+      const raw = localStorage.getItem("cp_last_suficiencia");
+      const obj = raw ? JSON.parse(raw) : null;
+      const lastId = obj?.id;
+      if (btnVerComprometido && lastId) {
+        btnVerComprometido.disabled = false;
+        btnVerComprometido.dataset.id = String(lastId);
+      }
+    } catch {}
 
     refreshTotales();
   }

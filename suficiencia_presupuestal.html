@@ -68,11 +68,14 @@
         <i class="bi bi-file-earmark-pdf me-1"></i>Descargar PDF
       </button>
 
-
-
       <a href="/public/PDF/INSTRUCTIVO_PARA_LLENAR_EL_FORMATO.pdf" target="_blank" class="btn btn-secondary btn-sm">
         <i class="bi bi-file-earmark-pdf-fill me-1"></i>Abrir instructivo en PDF
       </a>
+
+      <button id="btn-ver-comprometido" class="btn btn-outline-primary btn-sm" disabled>
+  <i class="bi bi-box-arrow-up-right me-1"></i>Ver comprometido
+</button>
+
     </div>
   </div>
 
@@ -106,12 +109,13 @@
       <tr>
         <th class="table-header" style="width:15%;">NOMBRE DE LA DEPENDENCIA GENERAL:</th>
         <td style="width:35%;">
-          <input type="text" class="form-control form-control-sm" name="dependencia" readonly>
+          <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia"
+            readonly>
         </td>
 
         <th class="table-header" style="width:15%;">FECHA DE ELABORACIÓN:</th>
         <td style="width:35%;">
-          <input type="date" class="form-control form-control-sm" name="fecha" readonly>
+          <input type="date" class="form-control form-control-sm as-text text-strong td-text" name="fecha" readonly>
         </td>
       </tr>
 
@@ -143,34 +147,29 @@
 
         <th class="table-header" style="background-color: rgb(180, 180, 180);;">PROGRAMACIÓN DE PAGO:</th>
         <td>
-  <div class="d-flex gap-2 align-items-center">
-    <select class="form-select form-select-sm" name="mes_pago">
-      <option value="ENERO">ENERO</option>
-      <option value="FEBRERO">FEBRERO</option>
-      <option value="MARZO">MARZO</option>
-      <option value="ABRIL">ABRIL</option>
-      <option value="MAYO">MAYO</option>
-      <option value="JUNIO">JUNIO</option>
-      <option value="JULIO">JULIO</option>
-      <option value="AGOSTO">AGOSTO</option>
-      <option value="SEPTIEMBRE">SEPTIEMBRE</option>
-      <option value="OCTUBRE">OCTUBRE</option>
-      <option value="NOVIEMBRE">NOVIEMBRE</option>
-      <option value="DICIEMBRE">DICIEMBRE</option>
-    </select>
+          <div class="d-flex gap-2 align-items-center">
+            <select class="form-select form-select-sm" name="mes_pago">
+              <option value="ENERO">ENERO</option>
+              <option value="FEBRERO">FEBRERO</option>
+              <option value="MARZO">MARZO</option>
+              <option value="ABRIL">ABRIL</option>
+              <option value="MAYO">MAYO</option>
+              <option value="JUNIO">JUNIO</option>
+              <option value="JULIO">JULIO</option>
+              <option value="AGOSTO">AGOSTO</option>
+              <option value="SEPTIEMBRE">SEPTIEMBRE</option>
+              <option value="OCTUBRE">OCTUBRE</option>
+              <option value="NOVIEMBRE">NOVIEMBRE</option>
+              <option value="DICIEMBRE">DICIEMBRE</option>
+            </select>
 
-    <!-- CANTIDAD (solo números) -->
-    <input
-      type="text"
-      class="form-control form-control-sm text-end"
-      name="cantidad_pago"
-      placeholder="Cantidad"
-      inputmode="numeric"
-      pattern="[0-9]*"
-      style="max-width: 180px;"
-    >
-  </div>
-</td>
+            <!-- CANTIDAD (solo números) -->
+            <input type="text" class="form-control form-control-sm as-text td-text text-strong text-end input-no-click"
+              name="cantidad_pago" placeholder="Cantidad" readonly>
+
+
+          </div>
+        </td>
 
       </tr>
     </table>
@@ -188,19 +187,16 @@
 
       <!-- botón + -->
       <div class="d-flex gap-2">
-  <!-- botón - -->
-  <button id="btn-remove-row" type="button" class="btn btn-sm btn-outline-danger" title="Quitar fila">
-    <i class="bi bi-dash-lg"></i>
-  </button>
+        <!-- botón - -->
+        <button id="btn-remove-row" type="button" class="btn btn-sm btn-outline-danger" title="Quitar fila">
+          <i class="bi bi-dash-lg"></i>
+        </button>
 
-  <!-- botón + -->
-  <button id="btn-add-row" type="button" class="btn btn-sm btn-outline-primary" title="Agregar fila">
-    <i class="bi bi-plus-lg"></i>
-  </button>
-</div>
-
-
-      <tbody id="detalleBody"></tbody>
+        <!-- botón + -->
+        <button id="btn-add-row" type="button" class="btn btn-sm btn-outline-primary" title="Agregar fila">
+          <i class="bi bi-plus-lg"></i>
+        </button>
+      </div>
     </div>
 
     <table class="table table-bordered mb-3">
@@ -373,9 +369,8 @@
 
   <script src="js/config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
-  <script type="module" src="js/suficiencia_presupuestal.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script type="module" src="js/suficiencia_presupuestal.js"></script>
   <script src="js/script.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="js/user-info.js"></script>
