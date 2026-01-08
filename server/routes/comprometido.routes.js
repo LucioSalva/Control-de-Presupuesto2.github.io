@@ -1,6 +1,7 @@
 // server/routes/comprometido.routes.js
 import { Router } from "express";
-import pool from "../db.js"; // <-- ajusta si tu pool está en otra ruta
+import { pool } from "../db.js";
+
 
 const router = Router();
 
