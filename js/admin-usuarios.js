@@ -1,10 +1,19 @@
 // =====================================================
-//  CONFIG
+//  CONFIG (SIN HARDcode: funciona en cualquier máquina)
 // =====================================================
-const ADMIN_API_BASE = "http://localhost:3000";
-const ENDPOINT_USUARIOS = `${ADMIN_API_BASE}/api/admin/usuarios`;
-const ENDPOINT_DGENERAL = `${ADMIN_API_BASE}/api/catalogos/dgeneral`;
-const ENDPOINT_DAUXILIAR = `${ADMIN_API_BASE}/api/catalogos/dauxiliar`;
+
+// Si window.API_URL existe (por ejemplo en producción), úsalo.
+// Si no existe, usa el mismo origen desde donde se abrió la página.
+const ADMIN_API_BASE =
+  (window.API_URL && String(window.API_URL).trim()) || window.location.origin;
+
+// helper para evitar doble slash
+const joinUrl = (base, p) => String(base).replace(/\/$/, "") + String(p);
+
+// Endpoints
+const ENDPOINT_USUARIOS = joinUrl(ADMIN_API_BASE, "/api/admin/usuarios");
+const ENDPOINT_DGENERAL = joinUrl(ADMIN_API_BASE, "/api/catalogos/dgeneral");
+const ENDPOINT_DAUXILIAR = joinUrl(ADMIN_API_BASE, "/api/catalogos/dauxiliar");
 
 const ROLES_VALIDOS = ["GOD", "ADMIN", "AREA"];
 

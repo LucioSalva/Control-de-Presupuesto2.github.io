@@ -50,7 +50,9 @@ app.use("/js", express.static(path.join(__dirname, "..", "js")));
 
 app.use("/api/catalogos", catalogosRoutes);
 
-app.use("/api/admin", adminUsuariosRouter);
+// app.use("/api/admin", adminUsuariosRouter);
+app.use("/api/admin/usuarios", adminUsuariosRouter);
+
 
 // Auth (login)
 app.use("/api", authRouter);
