@@ -226,7 +226,8 @@
       "fuente",
       data,
       (x) => x.id,
-      (x) => `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`
+      (x) =>
+        `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`
     );
   }
 
@@ -239,7 +240,10 @@
       "programa",
       data,
       (x) => x.id,
-      (x) => `${String(x.clave ?? "").trim()} - ${String(x.descripcion ?? "").trim()}`
+      (x) =>
+        `${String(x.clave ?? "").trim()} - ${String(
+          x.descripcion ?? ""
+        ).trim()}`
     );
   }
 
@@ -305,7 +309,9 @@
   }
 
   function renumberRows() {
-    const rows = detalleBody ? Array.from(detalleBody.querySelectorAll("tr")) : [];
+    const rows = detalleBody
+      ? Array.from(detalleBody.querySelectorAll("tr"))
+      : [];
     rows.forEach((tr, idx) => {
       const i = idx + 1;
       tr.setAttribute("data-row", String(i));
@@ -372,13 +378,24 @@
   }
 
   function getImpuestoTipo() {
-    return document.querySelector('input[name="impuesto_tipo"]:checked')?.value || "NONE";
+    return (
+      document.querySelector('input[name="impuesto_tipo"]:checked')?.value ||
+      "NONE"
+    );
+  }
+
+  function getIsrPercent() {
+    const el = document.querySelector('[name="isr_tasa"]');
+    let val = el ? Number(el.value) : 0;
+    if (!Number.isFinite(val)) val = 0;
+    if (val < 0) val = 0;
+    if (val > 100) val = 100;
+    return val;
   }
 
   function getIsrRate() {
-    const sel = document.querySelector('[name="isr_tasa"]');
-    const val = sel ? Number(sel.value) : 0;
-    return Number.isFinite(val) ? val : 0;
+    // convierte porcentaje a decimal: 10 => 0.10
+    return getIsrPercent() / 100;
   }
 
   function refreshTotales() {
@@ -392,7 +409,7 @@
     if (tipo === "IVA") {
       iva = subtotal * 0.16;
     } else if (tipo === "ISR") {
-      const rate = getIsrRate();
+      const rate = getIsrRate(); // 10 -> 0.10
       isr = subtotal * rate;
     }
 
@@ -454,10 +471,54 @@
     if (num === 0) return "CERO";
     if (num < 0) return "MENOS " + numeroALetras(Math.abs(num));
 
-    const unidades = ["", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"];
-    const decenas10 = ["DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE", "DIECISÉIS", "DIECISIETE", "DIECIOCHO", "DIECINUEVE"];
-    const decenas = ["", "", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"];
-    const centenas = ["", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"];
+    const unidades = [
+      "",
+      "UNO",
+      "DOS",
+      "TRES",
+      "CUATRO",
+      "CINCO",
+      "SEIS",
+      "SIETE",
+      "OCHO",
+      "NUEVE",
+    ];
+    const decenas10 = [
+      "DIEZ",
+      "ONCE",
+      "DOCE",
+      "TRECE",
+      "CATORCE",
+      "QUINCE",
+      "DIECISÉIS",
+      "DIECISIETE",
+      "DIECIOCHO",
+      "DIECINUEVE",
+    ];
+    const decenas = [
+      "",
+      "",
+      "VEINTE",
+      "TREINTA",
+      "CUARENTA",
+      "CINCUENTA",
+      "SESENTA",
+      "SETENTA",
+      "OCHENTA",
+      "NOVENTA",
+    ];
+    const centenas = [
+      "",
+      "CIENTO",
+      "DOSCIENTOS",
+      "TRESCIENTOS",
+      "CUATROCIENTOS",
+      "QUINIENTOS",
+      "SEISCIENTOS",
+      "SETECIENTOS",
+      "OCHOCIENTOS",
+      "NOVECIENTOS",
+    ];
 
     function seccion(n) {
       if (n === 0) return "";
@@ -525,18 +586,25 @@
   // ---------------------------
   function bindTaxEvents() {
     const radios = document.querySelectorAll('input[name="impuesto_tipo"]');
-    const isrSel = document.querySelector('[name="isr_tasa"]');
+    const isrInput = document.querySelector('[name="isr_tasa"]');
 
     radios.forEach((r) => {
       r.addEventListener("change", () => {
         const tipo = getImpuestoTipo();
-        if (isrSel) isrSel.disabled = tipo !== "ISR";
+
+        if (isrInput) {
+          isrInput.disabled = tipo !== "ISR";
+
+          if (tipo === "ISR" && !isrInput.value) isrInput.value = "10";
+        }
+
         refreshTotales();
       });
     });
 
-    isrSel?.addEventListener("change", refreshTotales);
-    if (isrSel) isrSel.disabled = getImpuestoTipo() !== "ISR";
+    isrInput?.addEventListener("input", refreshTotales);
+
+    if (isrInput) isrInput.disabled = getImpuestoTipo() !== "ISR";
   }
 
   // ---------------------------
@@ -701,7 +769,9 @@
       e.preventDefault();
 
       // 1) dataset
-      let id = btnVerComprometido.dataset.id ? Number(btnVerComprometido.dataset.id) : null;
+      let id = btnVerComprometido.dataset.id
+        ? Number(btnVerComprometido.dataset.id)
+        : null;
 
       // 2) lastSavedId
       if (!id && lastSavedId) id = Number(lastSavedId);

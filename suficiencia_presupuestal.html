@@ -304,11 +304,8 @@
         <label class="form-check-label">ISR</label>
       </div>
 
-      <select class="form-select form-select-sm" name="isr_tasa" style="width:120px;" disabled>
-        <option value="0.10">10%</option>
-        <option value="0.0125">1.25%</option>
-        <option value="0.04">4%</option>
-      </select>
+      <input type="number" class="form-control form-control-sm text-end" name="isr_tasa" style="width:120px;"
+        placeholder="Ej. 10 %" min="0" step="0.01" disabled />
     </div>
 
     <!-- Cantidad con letra -->
