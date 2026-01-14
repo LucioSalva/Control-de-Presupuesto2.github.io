@@ -4,7 +4,7 @@ body {
 
 /* NAVBAR vino fija arriba */
 .navbar {
-  background: #691c32;
+  background: #BC955C;
   position: fixed;
   top: 0;
   left: 0;
@@ -41,14 +41,14 @@ body {
 }
 
 .navbar-light .nav-link.active {
-  background-color: #691c32;
-  color: #ffffff !important;
+  background-color: #ECD798;
+  color: #000000 !important;
   border-radius: 0 0 0.25rem 0.25rem;
 }
 
 .navbar-light .nav-link:hover {
   background-color: #e9ecef;
-  color: #691c32 !important;
+  color: #BC955C !important;
 }
 
 .navbar-light .nav-link.active:hover {

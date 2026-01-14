@@ -11,23 +11,36 @@ const router = Router();
 router.get("/projects", async (_req, res) => {
   try {
     const r = await query(`
+      WITH p AS (
+        SELECT
+          id_proyecto                       AS project,
+          MIN(id_dgeneral)                  AS id_dgeneral,
+          MIN(id_dauxiliar)                 AS id_dauxiliar,
+          MIN(id_fuente)                    AS id_fuente,
+          COUNT(*)                          AS partidas,
+          COALESCE(SUM(presupuesto),0)      AS presupuesto_total,
+          COALESCE(SUM(total_gastado),0)    AS gastado_total,
+          COALESCE(SUM(saldo_disponible),0) AS saldo_total
+        FROM presupuesto_detalle
+        GROUP BY id_proyecto
+      )
       SELECT
-        id_proyecto                       AS project,
-        MIN(id_dgeneral)                  AS id_dgeneral,
-        COUNT(*)                          AS partidas,
-        COALESCE(SUM(presupuesto),0)      AS presupuesto_total,
-        COALESCE(SUM(total_gastado),0)    AS gastado_total,
-        COALESCE(SUM(saldo_disponible),0) AS saldo_total
-      FROM presupuesto_detalle
-      GROUP BY id_proyecto
-      ORDER BY id_proyecto
+        p.*,
+        dg.clave AS dgeneral_clave
+      FROM p
+      LEFT JOIN dgeneral dg ON dg.id = p.id_dgeneral
+      ORDER BY p.project
     `);
+
     res.json(r.rows);
   } catch (err) {
     console.error("GET /api/projects", err);
     res.status(500).json({ error: "Error obteniendo proyectos" });
   }
 });
+
+
+
 
 /* =====================================================
    DETALLES (partidas por proyecto)

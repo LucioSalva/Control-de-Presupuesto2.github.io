@@ -10,7 +10,7 @@ body {
    NAVBAR PRINCIPAL (vino)
    ========================= */
 .navbar {
-  background: #691c32;
+  background: #BC955C;
   position: fixed;
   top: 0;
   left: 0;
@@ -40,13 +40,13 @@ body {
 }
 
 .navbar-light .nav-link.active {
-  background-color: #691c32;
+  background-color: #BC955C;
   color: #ffffff !important;
 }
 
 .navbar-light .nav-link:hover {
   background-color: #e9ecef;
-  color: #691c32 !important;
+  color: #BC955C !important;
 }
 
 .navbar-light .nav-link.active:hover {
@@ -276,7 +276,7 @@ input[type="date"].as-text::-webkit-inner-spin-button {
 .form-container input.form-control:not(.as-text):focus,
 .form-container select.form-select:not(.as-text):focus {
   box-shadow: none;
-  border-color: #691c32;
+  border-color: #BC955C;
 }
 
 /* =========================

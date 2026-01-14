@@ -1,11 +1,11 @@
 // =====================================================
-//  CONFIG (SIN HARDcode: funciona en cualquier máquina)
+//  CONFIG (SIN HARDcode pero con fallback correcto a API:3000)
 // =====================================================
 
-// Si window.API_URL existe (por ejemplo en producción), úsalo.
-// Si no existe, usa el mismo origen desde donde se abrió la página.
+// Si window.API_URL existe (prod), úsalo.
+// Si NO existe, en desarrollo usa localhost:3000 (porque tu HTML corre en 5502).
 const ADMIN_API_BASE =
-  (window.API_URL && String(window.API_URL).trim()) || window.location.origin;
+  (window.API_URL && String(window.API_URL).trim()) || "http://localhost:3000";
 
 // helper para evitar doble slash
 const joinUrl = (base, p) => String(base).replace(/\/$/, "") + String(p);
@@ -16,6 +16,26 @@ const ENDPOINT_DGENERAL = joinUrl(ADMIN_API_BASE, "/api/catalogos/dgeneral");
 const ENDPOINT_DAUXILIAR = joinUrl(ADMIN_API_BASE, "/api/catalogos/dauxiliar");
 
 const ROLES_VALIDOS = ["GOD", "ADMIN", "AREA"];
+
+// =====================================================
+//  TOKEN / AUTH HEADERS
+// =====================================================
+function getToken() {
+  return (
+    localStorage.getItem("cp_token") ||
+    sessionStorage.getItem("cp_token") ||
+    localStorage.getItem("token") ||
+    sessionStorage.getItem("token") ||
+    localStorage.getItem("authToken") ||
+    sessionStorage.getItem("authToken") ||
+    ""
+  );
+}
+
+function authHeaders() {
+  const t = getToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
 
 // =====================================================
 //  ACTOR (quién está logueado) -> para auditoría
@@ -32,21 +52,26 @@ function getActorId() {
   }
 }
 
-function actorHeaders(isJson = true) {
+// Headers completos: Authorization + x-user-id + Content-Type opcional
+function buildHeaders(isJson = false) {
   const actorId = getActorId();
-  const h = {};
+  const h = {
+    ...authHeaders(),
+  };
   if (isJson) h["Content-Type"] = "application/json";
   if (actorId) h["x-user-id"] = String(actorId);
   return h;
 }
 
 // =====================================================
-//  GUARD: solo Lucio / GOD
+//  GUARD: requiere sesión + solo GOD o Lucio
 // =====================================================
 (function adminGuard() {
   try {
+    const token = getToken();
     const raw = localStorage.getItem("cp_usuario");
-    if (!raw) {
+
+    if (!token || !raw) {
       window.location.href = "login.html";
       return;
     }
@@ -69,8 +94,8 @@ function actorHeaders(isJson = true) {
     const esDios = rolesNorm.includes("GOD");
 
     if (!(esLucio || esDios)) {
-      console.warn("[ADMIN-GUARD] No es admin, mandando a index");
-      window.location.href = "index.html";
+      console.warn("[ADMIN-GUARD] No es admin, mandando a suficienciapresupuestal");
+      window.location.href = "suficiencia_presupuestal.html";
     } else {
       console.log("[ADMIN-GUARD] Acceso permitido a admin-usuarios");
     }
@@ -125,7 +150,10 @@ function formatFecha(fechaStr) {
 //  CATALOGO DGENERAL (SELECT)
 // =====================================================
 async function fetchDgeneralCatalog() {
-  const res = await fetch(ENDPOINT_DGENERAL, { headers: actorHeaders(true) });
+  const res = await fetch(ENDPOINT_DGENERAL, {
+    headers: buildHeaders(false),
+  });
+
   const data = await res.json().catch(() => null);
 
   if (!res.ok) throw new Error((data && data.error) || "Error cargando catálogo dgeneral");
@@ -151,7 +179,10 @@ function fillDgeneralSelect() {
 //  CATALOGO DAUXILIAR (SELECT)
 // =====================================================
 async function fetchDauxiliarCatalog() {
-  const res = await fetch(ENDPOINT_DAUXILIAR, { headers: actorHeaders(true) });
+  const res = await fetch(ENDPOINT_DAUXILIAR, {
+    headers: buildHeaders(false),
+  });
+
   const data = await res.json().catch(() => null);
 
   if (!res.ok) throw new Error((data && data.error) || "Error cargando catálogo dauxiliar");
@@ -180,7 +211,10 @@ async function fetchUsuarios() {
   try {
     hideAlert();
 
-    const res = await fetch(ENDPOINT_USUARIOS, { headers: actorHeaders(true) });
+    const res = await fetch(ENDPOINT_USUARIOS, {
+      headers: buildHeaders(false),
+    });
+
     const data = await res.json().catch(() => null);
 
     if (!res.ok) throw new Error((data && data.error) || "Error al obtener usuarios");
@@ -199,7 +233,7 @@ async function fetchUsuarios() {
 async function crearUsuario(payload) {
   const res = await fetch(ENDPOINT_USUARIOS, {
     method: "POST",
-    headers: actorHeaders(true),
+    headers: buildHeaders(true),
     body: JSON.stringify(payload),
   });
 
@@ -211,7 +245,7 @@ async function crearUsuario(payload) {
 async function actualizarUsuario(id, payload) {
   const res = await fetch(`${ENDPOINT_USUARIOS}/${id}`, {
     method: "PUT",
-    headers: actorHeaders(true),
+    headers: buildHeaders(true),
     body: JSON.stringify(payload),
   });
 
@@ -223,7 +257,7 @@ async function actualizarUsuario(id, payload) {
 async function eliminarUsuario(id) {
   const res = await fetch(`${ENDPOINT_USUARIOS}/${id}`, {
     method: "DELETE",
-    headers: actorHeaders(false),
+    headers: buildHeaders(false),
   });
 
   const data = await res.json().catch(() => null);
