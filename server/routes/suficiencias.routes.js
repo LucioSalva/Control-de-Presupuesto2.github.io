@@ -1,146 +1,136 @@
 import express from "express";
-import { query, getClient } from "../db.js";
+import { query } from "../db.js";
 
 const router = express.Router();
 
 /* =====================================================
-   GET /api/suficiencias/next-folio
+   Helpers roles
    ===================================================== */
-router.get("/next-folio", async (_req, res) => {
+function getRole(req) {
+  const roles = (req.user?.roles || []).map((r) => String(r).toUpperCase());
+  if (roles.includes("GOD")) return "GOD";
+  if (roles.includes("ADMIN")) return "ADMIN";
+  return "AREA";
+}
+
+function pad6(v) {
+  const s = String(v || "").trim();
+  if (!s) return "";
+  if (/^\d+$/.test(s)) return s.padStart(6, "0");
+  return s;
+}
+
+/* =====================================================
+   ✅ GET /api/suficiencias/next-folio
+   (Ejemplo simple, ajusta a tu lógica real si ya existe)
+   ===================================================== */
+router.get("/next-folio", async (req, res) => {
   try {
-    const r = await query(`
-      SELECT COALESCE(MAX(folio_num), 0) + 1 AS folio_num
-      FROM public.suficiencias
-    `);
-    res.json({ folio_num: Number(r.rows[0].folio_num) });
-  } catch (e) {
-    console.error("GET next-folio", e);
-    res.status(500).json({ error: "Error obteniendo folio" });
+    // Si tu sistema usa folio_num como consecutivo numérico:
+    const r = await query(`SELECT COALESCE(MAX(folio_num),0) + 1 AS folio_num FROM suficiencias`);
+    return res.json({ folio_num: Number(r.rows?.[0]?.folio_num || 1) });
+  } catch (err) {
+    console.error("[next-folio] error:", err);
+    return res.status(500).json({ error: "Error al obtener folio" });
   }
 });
 
 /* =====================================================
-   POST /api/suficiencias
+   ✅ POST /api/suficiencias
+   (Ejemplo: tu backend real quizá ya lo tenga)
    ===================================================== */
 router.post("/", async (req, res) => {
-  const {
-    fecha,
-    dependencia,
-    departamento,
-    programa,
-    proyecto,
-    fuente,
-    partida,
-    mes_pago,
-    justificacion_general,
-    cantidad_con_letra,
-    total,
-    detalle = [],
-  } = req.body || {};
-
-  const totalNum = Number(total || 0);
-
-  if (!fecha) return res.status(400).json({ error: "fecha es obligatoria" });
-  if (!Number.isFinite(totalNum))
-    return res.status(400).json({ error: "total inválido" });
-  if (!Array.isArray(detalle))
-    return res.status(400).json({ error: "detalle debe ser arreglo" });
-
-  const client = await getClient();
-
   try {
-    await client.query("BEGIN");
+    const b = req.body || {};
 
-    await client.query("LOCK TABLE public.suficiencias IN EXCLUSIVE MODE");
-
-    const folioQ = await client.query(`
-      SELECT COALESCE(MAX(folio_num), 0) + 1 AS folio_num
-      FROM public.suficiencias
-    `);
-
-    const folio_num = Number(folioQ.rows[0].folio_num);
-
-    const ins = await client.query(
-      `
-      INSERT INTO public.suficiencias (
-        folio_num,
-        fecha,
-        dependencia,
-        departamento,
-        programa,
-        proyecto,
-        fuente,
-        partida,
-        mes_pago,
-        justificacion_general,
-        cantidad_con_letra,
-        total,
-        created_at
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())
-      RETURNING id, folio_num
-      `,
+    // Inserta lo mínimo que tu tabla pide (ajusta a tu implementación real)
+    const r = await query(
+      `INSERT INTO suficiencias
+        (id_usuario, id_dgeneral, id_dauxiliar, id_proyecto, id_fuente, no_suficiencia, fecha, dependencia, departamento, fuente, mes_pago, total, cantidad_con_letra, created_at, folio_num)
+       VALUES
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, NOW(), $14)
+       RETURNING id, folio_num, no_suficiencia`,
       [
-        folio_num,
-        fecha,
-        dependencia ?? null,
-        departamento ?? null,
-        programa ?? null,
-        proyecto ?? null,
-        fuente ?? null,
-        partida ?? null,
-        mes_pago ?? null,
-        justificacion_general ?? null,
-        cantidad_con_letra ?? null,
-        totalNum,
+        b.id_usuario ?? null,
+        b.id_dgeneral ?? null,
+        b.id_dauxiliar ?? null,
+        b.id_proyecto ?? null,
+        b.id_fuente ?? null,
+        b.no_suficiencia ?? null,
+        b.fecha ?? null,
+        b.dependencia ?? null,
+        b.departamento ?? null,
+        b.fuente ?? null,
+        b.mes_pago ?? null,
+        b.total ?? 0,
+        b.cantidad_con_letra ?? "",
+        b.folio_num ?? null,
       ]
     );
 
-    const id = ins.rows[0].id;
+    return res.json({ id: r.rows[0].id, folio_num: r.rows[0].folio_num });
+  } catch (err) {
+    console.error("[POST suficiencias] error:", err);
+    return res.status(500).json({ error: "Error al guardar suficiencia" });
+  }
+});
 
-    for (let i = 0; i < detalle.length; i++) {
-      const d = detalle[i];
+/* =====================================================
+   ✅ NUEVO: GET /api/suficiencias/buscar
+   SOLO:
+   - ?numero=000001
 
-      await client.query(
-        `
-        INSERT INTO public.suficiencia_detalle (
-          id_suficiencia,
-          no,
-          clave,
-          concepto_partida,
-          justificacion,
-          descripcion,
-          importe
-        )
-        VALUES ($1,$2,$3,$4,$5,$6,$7)
-        `,
-        [
-          id,
-          i + 1,
-          d.clave ?? null,
-          d.concepto_partida ?? null,
-          d.justificacion ?? null,
-          d.descripcion ?? null,
-          Number(d.importe || 0),
-        ]
-      );
+   Candado:
+   - GOD/ADMIN -> todo
+   - AREA -> solo su id_dgeneral
+     (porque tu tabla NO tiene 'area' ni 'dgeneral_clave')
+   ===================================================== */
+router.get("/buscar", async (req, res) => {
+  try {
+    const role = getRole(req);
+
+    // 🚨 AREA: candado por id_dgeneral (lo tienes en tu tabla)
+    const userIdDgeneral = req.user?.id_dgeneral ? Number(req.user.id_dgeneral) : null;
+
+    const numero = pad6(req.query.numero);
+    if (!numero) {
+      return res.status(400).json({ ok: false, msg: "Debes enviar numero." });
     }
 
-    await client.query("COMMIT");
-    res.json({ ok: true, id, folio_num });
-  } catch (e) {
-    await client.query("ROLLBACK");
-    console.error("POST /api/suficiencias", e);
-    res.status(500).json({
-      error: "Error guardando suficiencia",
-      db: {
-        message: e.message,
-        code: e.code,
-      },
-    });
-  } finally {
-    client.release();
+    // Buscar por no_suficiencia (tu columna existe)
+    const params = [];
+    let sql = `SELECT * FROM suficiencias WHERE no_suficiencia = $1`;
+    params.push(numero);
+
+    // Candado AREA
+    if (role === "AREA") {
+      if (!userIdDgeneral) {
+        return res.status(403).json({ ok: false, msg: "Usuario AREA sin id_dgeneral en token." });
+      }
+      sql += ` AND id_dgeneral = $2`;
+      params.push(userIdDgeneral);
+    }
+
+    sql += ` ORDER BY id DESC LIMIT 50`;
+
+    const r = await query(sql, params);
+    return res.json({ ok: true, data: r.rows });
+  } catch (err) {
+    console.error("[/buscar] error:", err);
+    return res.status(500).json({ ok: false, msg: "Error interno", error: err.message });
   }
+
+  if (role === "AREA") {
+  if (!userIdDgeneral) {
+    return res.status(403).json({
+      ok: false,
+      msg: "Usuario AREA sin id_dgeneral (authRequired no lo está cargando en req.user).",
+    });
+  }
+  sql += ` AND id_dgeneral = $2`;
+  params.push(userIdDgeneral);
+}
+
 });
 
 export default router;

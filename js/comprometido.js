@@ -212,179 +212,143 @@
   // ---------------------------
   // PDF (igual idea que suficiencia)
   // ---------------------------
-  function splitFechaParts(fechaStr) {
-    const s = formatFecha(fechaStr);
-    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if (!m) return { d: "", m: "", y: "" };
-    return { y: m[1], m: m[2], d: m[3] };
+  function splitFechaParts(isoDate) {
+  // isoDate: "YYYY-MM-DD"
+  try {
+    const [y, m, d] = String(isoDate || "").split("-");
+    return { d: d || "", m: m || "", y: y || "" };
+  } catch {
+    return { d: "", m: "", y: "" };
+  }
+}
+
+function detalleToLines(detalle) {
+  const rows = Array.isArray(detalle) ? detalle : [];
+  const join = (arr) => arr.join("\n");
+
+  return {
+    No: join(rows.map(r => String(r.no ?? ""))),
+    CLAVE: join(rows.map(r => String(r.clave ?? ""))),
+    "CONCEPTO DE PARTIDA": join(rows.map(r => String(r.concepto_partida ?? ""))),
+    "JUSTIFICACIÓN": join(rows.map(r => String(r.justificacion ?? ""))),
+    "DESCRIPCIÓN": join(rows.map(r => String(r.descripcion ?? ""))),
+    IMPORTE: join(rows.map(r => safeNumber(r.importe).toFixed(2))),
+  };
+}
+
+async function fetchPdfTemplateBytesSuf() {
+  const r = await fetch(SUF_PDF_TEMPLATE_URL);
+  if (!r.ok) throw new Error("No se pudo cargar la plantilla PDF de Suficiencia");
+  return await r.arrayBuffer();
+}
+
+async function generarPDFSuficiencia() {
+  refreshTotales();
+  updateClaveProgramatica();
+
+  if (!window.PDFLib?.PDFDocument) {
+    alert("Falta pdf-lib. Asegúrate que se carga antes del module.");
+    return;
   }
 
-  function detalleToLines(detalle) {
-    const rows = (detalle || []).filter((r) => {
-      const hasAny =
-        String(r.clave || "").trim() ||
-        String(r.concepto_partida || "").trim() ||
-        String(r.justificacion || "").trim() ||
-        String(r.descripcion || "").trim() ||
-        safeNumber(r.importe) > 0;
-      return hasAny;
-    });
+  const payload = buildPayload();
 
-    const colNo = [];
-    const colClave = [];
-    const colConcepto = [];
-    const colJust = [];
-    const colDesc = [];
-    const colImporte = [];
+  const detalle = payload?.detalle || [];
+  const cols = detalleToLines(detalle);
 
-    rows.forEach((r, idx) => {
-      colNo.push(String(idx + 1));
-      colClave.push(String(r.clave ?? "").trim());
-      colConcepto.push(String(r.concepto_partida ?? "").trim());
-      colJust.push(String(r.justificacion ?? "").trim());
-      colDesc.push(String(r.descripcion ?? "").trim());
-      colImporte.push(safeNumber(r.importe).toFixed(2));
-    });
+  const { d, m, y } = splitFechaParts(payload?.fecha);
 
-    return {
-      No: colNo.join("\n"),
-      CLAVE: colClave.join("\n"),
-      "CONCEPTO DE PARTIDA": colConcepto.join("\n"),
-      JUSTIFICACIÓN: colJust.join("\n"),
-      DESCRIPCIÓN: colDesc.join("\n"),
-      IMPORTE: colImporte.join("\n"),
-    };
-  }
+  const templateBytes = await fetchPdfTemplateBytesSuf();
+  const pdfDoc = await PDFLib.PDFDocument.load(templateBytes);
+  const form = pdfDoc.getForm();
 
-  async function fetchPdfTemplateBytes() {
-    const candidates = [
-      "./public/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf",
-      "./PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf",
-      "/public/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf",
-      "/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf",
-    ];
-
-    let lastErr = null;
-    for (const url of candidates) {
-      try {
-        const r = await fetch(url, { cache: "no-store" });
-        const buf = await r.arrayBuffer();
-        const head = new Uint8Array(buf.slice(0, 5));
-        const headStr = String.fromCharCode(...head);
-        if (!headStr.startsWith("%PDF"))
-          throw new Error(`No PDF header en ${url}`);
-        return buf;
-      } catch (e) {
-        lastErr = e;
-      }
+  const setTextSafe = (fieldName, value) => {
+    try {
+      const f = form.getTextField(fieldName);
+      f.setText(String(value ?? ""));
+    } catch (e) {
+      console.warn("[PDF] Campo no encontrado:", fieldName);
     }
-    throw lastErr || new Error("No se pudo cargar el PDF template.");
+  };
+
+  // ============================
+  // CABECERA (tus nombres exactos)
+  // ============================
+  setTextSafe("NOMBRE DE LA DEPENDENCIA GENERAL:", get("dependencia") || "");
+
+  // En tu PDF SÍ existe este campo con ":" al final
+  setTextSafe("CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload?.clave_programatica || "");
+
+  // Si quieres que también se repita aquí (mismo valor o descripción)
+  setTextSafe("NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload?.clave_programatica || "");
+
+  // Fuente (en el PDF existe "FUENTE DE FINANCIAMIENTO" sin :)
+  // Como tu select guarda el ID, mejor guardamos el texto visible del option:
+  const fuenteSel = document.querySelector('[name="fuente"]');
+  const fuenteTxt = fuenteSel?.selectedOptions?.[0]?.textContent || "";
+  setTextSafe("FUENTE DE FINANCIAMIENTO", fuenteTxt);
+
+  // Si tu PDF espera también "NOMBRE F.F" puedes mandar lo mismo o algo diferente
+  setTextSafe("NOMBRE F.F", fuenteTxt);
+
+  setTextSafe("fechadia", d);
+  setTextSafe("fechames", m);
+  setTextSafe("fechayear", y);
+
+  // ============================
+  // PROGRAMACIÓN DE PAGO (igual que en comprometido)
+  // ============================
+  const mesSel = String(payload?.mes_pago || "").trim().toUpperCase();
+  const totalTxt = safeNumber(payload?.total).toFixed(2);
+
+  const meses = [
+    "ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO",
+    "JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"
+  ];
+
+  for (const mes of meses) {
+    const fname = `${mes}PROGRAMACIÓN DE PAGO`; // 👈 coincide exacto con tu lista
+    setTextSafe(fname, mes === mesSel ? totalTxt : "");
   }
 
-  async function generarPDF(payload) {
-    refreshGuard();
+  // ============================
+  // DETALLE
+  // ============================
+  setTextSafe("No", cols.No);
+  setTextSafe("CLAVE", cols.CLAVE);
+  setTextSafe("CONCEPTO DE PARTIDA", cols["CONCEPTO DE PARTIDA"]);
+  setTextSafe("JUSTIFICACIÓN", cols["JUSTIFICACIÓN"]);
+  setTextSafe("DESCRIPCIÓN", cols["DESCRIPCIÓN"]);
+  setTextSafe("IMPORTE", cols.IMPORTE);
 
-    if (!window.PDFLib?.PDFDocument) {
-      alert("Falta pdf-lib. Asegúrate que se carga antes del module.");
-      return;
-    }
+  // ============================
+  // TOTALES
+  // ============================
+  setTextSafe("subtotal", safeNumber(payload?.subtotal).toFixed(2));
+  setTextSafe("IVA", safeNumber(payload?.iva).toFixed(2));
+  setTextSafe("ISR", safeNumber(payload?.isr).toFixed(2));
+  setTextSafe("total", safeNumber(payload?.total).toFixed(2));
+  setTextSafe("CANTIDAD CON LETRA:", payload?.cantidad_con_letra || "");
+  setTextSafe("Meta", payload?.meta || "");
 
-    const detalle = payload?.detalle || [];
-    const cols = detalleToLines(detalle);
-    const { d, m, y } = splitFechaParts(payload?.fecha);
+  // Aplanar para no editable
+  form.flatten();
 
-    const templateBytes = await fetchPdfTemplateBytes();
-    const pdfDoc = await PDFLib.PDFDocument.load(templateBytes);
-    const form = pdfDoc.getForm();
+  const outBytes = await pdfDoc.save();
+  const blob = new Blob([outBytes], { type: "application/pdf" });
+  const url = URL.createObjectURL(blob);
 
-    const setTextSafe = (fieldName, value) => {
-      try {
-        const f = form.getTextField(fieldName);
-        f.setText(String(value ?? ""));
-      } catch {}
-    };
+  const folio = String(get("no_suficiencia") || "").padStart(6, "0") || "000000";
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `SUFICIENCIA_${folio}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 
-    // CABECERA
-    setTextSafe(
-      "NOMBRE DE LA DEPENDENCIA GENERAL:",
-      payload?.dependencia || ""
-    );
-    setTextSafe(
-      "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
-      payload?.id_proyecto_programatico || ""
-    );
-    setTextSafe(
-      "FUENTE DE FINANCIAMIENTO",
-      String(payload?.id_fuente || payload?.fuente || "")
-    );
-    setTextSafe(
-      "NOMBRE F.F",
-      String(payload?.id_programa || payload?.programa || "")
-    );
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
 
-    setTextSafe("fechadia", d);
-    setTextSafe("fechames", m);
-    setTextSafe("fechayear", y);
-
-    // PROGRAMACIÓN DE PAGO: escribir TOTAL en el mes seleccionado (sin "tache")
-    const mesSel = String(payload?.mes_pago || "")
-      .trim()
-      .toUpperCase();
-    const totalTxt = safeNumber(payload?.total).toFixed(2);
-
-    const meses = [
-      "ENERO",
-      "FEBRERO",
-      "MARZO",
-      "ABRIL",
-      "MAYO",
-      "JUNIO",
-      "JULIO",
-      "AGOSTO",
-      "SEPTIEMBRE",
-      "OCTUBRE",
-      "NOVIEMBRE",
-      "DICIEMBRE",
-    ];
-
-    for (const mes of meses) {
-      const fname = `${mes}PROGRAMACIÓN DE PAGO`;
-      setTextSafe(fname, mes === mesSel ? totalTxt : "");
-    }
-
-    // DETALLE
-    setTextSafe("No", cols.No);
-    setTextSafe("CLAVE", cols.CLAVE);
-    setTextSafe("CONCEPTO DE PARTIDA", cols["CONCEPTO DE PARTIDA"]);
-    setTextSafe("JUSTIFICACIÓN", cols["JUSTIFICACIÓN"]);
-    setTextSafe("DESCRIPCIÓN", cols["DESCRIPCIÓN"]);
-    setTextSafe("IMPORTE", cols.IMPORTE);
-
-    // TOTALES
-    setTextSafe("subtotal", safeNumber(payload?.subtotal).toFixed(2));
-    setTextSafe("IVA", safeNumber(payload?.iva).toFixed(2));
-    setTextSafe("ISR", safeNumber(payload?.isr).toFixed(2));
-    setTextSafe("total", safeNumber(payload?.total).toFixed(2));
-    setTextSafe("CANTIDAD CON LETRA:", payload?.cantidad_con_letra || "");
-    setTextSafe("Meta", payload?.meta || "");
-
-    // Aplanar para no editable
-    form.flatten();
-
-    const outBytes = await pdfDoc.save();
-    const blob = new Blob([outBytes], { type: "application/pdf" });
-    const url = URL.createObjectURL(blob);
-
-    const folio = String(payload?.folio_num || "").padStart(6, "0") || "000000";
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `COMPROMETIDO_${folio}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    setTimeout(() => URL.revokeObjectURL(url), 1500);
-  }
 
   // evita errores por campos vacíos
   function refreshGuard() {

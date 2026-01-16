@@ -1,3 +1,4 @@
+
 (() => {
   const MAX_ROWS = 20;
   const START_ROWS = 3;
@@ -5,14 +6,22 @@
   // ✅ API base: si no existe window.API_URL, usa localhost:3000
   const API = (window.API_URL || "http://localhost:3000").replace(/\/$/, "");
 
+  // ✅ PDF plantilla (ruta real)
+  const SUF_PDF_TEMPLATE_URL = "/public/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
+
+  // ✅ Debug de campos PDF (APAGADO por defecto)
+  const DEBUG_PDF_FIELDS = false;
+
   // ---------------------------
   // DOM
   // ---------------------------
   const btnGuardar = document.getElementById("btn-guardar");
   const btnSi = document.getElementById("btn-si-seguro");
-  const btnDescargarExcel = document.getElementById("btn-descargar-excel");
   const btnDescargarPdf = document.getElementById("btn-descargar-pdf");
   const btnVerComprometido = document.getElementById("btn-ver-comprometido");
+
+  // OJO: en tu HTML el botón es btn-export-xlsx
+  const btnExportXlsx = document.getElementById("btn-export-xlsx");
 
   const btnAddRow = document.getElementById("btn-add-row");
   const btnRemoveRow = document.getElementById("btn-remove-row");
@@ -21,7 +30,32 @@
   const modalEl = document.getElementById("modalConfirm");
   const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
 
+  // ---------------------------
+  // ✅ NUEVO: BUSCADOR (botón + panel)
+  // ---------------------------
+  const btnToggleBuscar = document.getElementById("btnToggleBuscar");
+  const panelBuscarEl = document.getElementById("panelBuscarSuf");
+
+  const txtNumeroSuf = document.getElementById("txtNumeroSuf");
+  const txtDepClave = document.getElementById("txtDepClave");
+  const txtProgClave = document.getElementById("txtProgClave");
+
+  const btnBuscarNumero = document.getElementById("btnBuscarNumero");
+  const btnBuscarClaves = document.getElementById("btnBuscarClaves");
+  const btnCerrarBuscar = document.getElementById("btnCerrarBuscar");
+  const btnCerrarBuscar2 = document.getElementById("btnCerrarBuscar2");
+
+  const panelBuscar = panelBuscarEl
+    ? new bootstrap.Collapse(panelBuscarEl, { toggle: false })
+    : null;
+
   let lastSavedId = null;
+
+  // caches
+  let dgeneralInfo = null; // {id, clave, dependencia}
+  let dauxiliarInfo = null; // {id, clave, dependencia}
+  let proyectosById = {}; // { [id]: {id, clave, conac, descripcion} }
+  let partidasMap = {}; // { "5151": "..." }
 
   // ---------------------------
   // AUTH ✅ (incluye cp_token)
@@ -50,12 +84,17 @@
     if (el) el.value = value ?? "";
   };
 
+  const setReadonly = (name, ro = true) => {
+    const el = document.querySelector(`[name="${name}"]`);
+    if (el) el.readOnly = !!ro;
+  };
+
   function safeNumber(n) {
     const x = Number(n);
     return Number.isFinite(x) ? x : 0;
   }
 
-  // ✅ helper: evita "Unexpected token <"
+  // ✅ helper: evita "Unexpected token <" y muestra errores DB
   async function fetchJson(url, options = {}) {
     const r = await fetch(url, options);
     const text = await r.text();
@@ -66,10 +105,65 @@
     } catch {}
 
     if (!r.ok) {
-      const msg = data?.error || `HTTP ${r.status} en ${url}`;
+      const msg =
+        data?.db?.message ||
+        data?.error ||
+        data?.message ||
+        `HTTP ${r.status} en ${url}`;
       throw new Error(msg);
     }
     return data;
+  }
+
+  function getLoggedUser() {
+    try {
+      return JSON.parse(localStorage.getItem("cp_usuario") || "null");
+    } catch {
+      return null;
+    }
+  }
+
+  // ---------------------------
+  // ✅ NUEVO: Helpers / funciones BUSCADOR
+  // ---------------------------
+  function pad6(value) {
+    const v = String(value || "").trim();
+    if (!v) return "";
+    if (/^\d+$/.test(v)) return v.padStart(6, "0");
+    return v;
+  }
+
+  // ✅ No tocamos tu UI: por ahora solo consola + alert.
+  // Si quieres, luego lo conectamos a una tabla / modal.
+  function renderResultadosBusqueda(rows) {
+    console.log("[BUSCAR] resultados:", rows);
+
+    if (!rows || !rows.length) {
+      alert("No encontrada (o no corresponde a tu área).");
+      return;
+    }
+
+    const folios = rows
+      .map((r) => String(r.no_suficiencia ?? r.folio_num ?? r.numero_suficiencia ?? "").trim())
+      .filter(Boolean);
+
+    alert(`Encontrada(s): ${rows.length}${folios.length ? "\nFolios: " + folios.join(", ") : ""}`);
+  }
+
+  async function buscarPorNumero(numero) {
+    const num = pad6(numero);
+    const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(num)}`;
+    const json = await fetchJson(url, { headers: { ...authHeaders() } });
+    renderResultadosBusqueda(json?.data || []);
+  }
+
+  async function buscarPorClaves(dep, prog) {
+    const d = String(dep || "").trim();
+    const p = String(prog || "").trim();
+    const qs = new URLSearchParams({ dep: d, prog: p });
+    const url = `${API}/api/suficiencias/buscar?${qs.toString()}`;
+    const json = await fetchJson(url, { headers: { ...authHeaders() } });
+    renderResultadosBusqueda(json?.data || []);
   }
 
   // ---------------------------
@@ -115,10 +209,8 @@
   }
 
   // ---------------------------
-  // Catálogo de partidas
+  // Catálogo de partidas (para el detalle)
   // ---------------------------
-  let partidasMap = {};
-
   async function loadPartidasCatalog() {
     const data = await fetchJson(`${API}/api/catalogos/partidas`, {
       headers: { ...authHeaders() },
@@ -133,47 +225,85 @@
   }
 
   // ---------------------------
-  // Dependencia readonly desde usuario (dgeneral)
+  // Dependencias desde usuario (dgeneral + dauxiliar)
   // ---------------------------
-  function getLoggedUser() {
-    try {
-      return JSON.parse(localStorage.getItem("cp_usuario") || "null");
-    } catch {
-      return null;
-    }
-  }
-
-  async function setDependenciaReadonly() {
-    const depEl = document.querySelector(`[name="dependencia"]`);
-    if (depEl) depEl.readOnly = true;
+  async function loadDependenciasFromUser() {
+    setReadonly("dependencia", true);
+    setReadonly("dependencia_aux", true);
 
     const user = getLoggedUser();
+    const idDg = user?.id_dgeneral != null ? Number(user.id_dgeneral) : null;
+    const idDa = user?.id_dauxiliar != null ? Number(user.id_dauxiliar) : null;
 
-    if (user?.dgeneral_nombre) {
-      setVal("dependencia", user.dgeneral_nombre);
-      return;
-    }
+    setVal("id_dgeneral", idDg ?? "");
+    setVal("id_dauxiliar", idDa ?? "");
 
-    if (user?.id_dgeneral) {
-      const data = await fetchJson(`${API}/api/catalogos/dgeneral`, {
+    const [dgCatalog, daCatalog] = await Promise.all([
+      fetchJson(`${API}/api/catalogos/dgeneral`, {
         headers: { ...authHeaders() },
-      });
+      }),
+      fetchJson(`${API}/api/catalogos/dauxiliar`, {
+        headers: { ...authHeaders() },
+      }),
+    ]);
 
-      const found = (data || []).find(
-        (x) => Number(x.id) === Number(user.id_dgeneral)
-      );
+    dgeneralInfo = (dgCatalog || []).find((x) => Number(x.id) === idDg) || null;
+    dauxiliarInfo =
+      (daCatalog || []).find((x) => Number(x.id) === idDa) || null;
 
-      if (found?.dependencia) {
-        setVal("dependencia", found.dependencia);
-        return;
-      }
-    }
+    const depGenNombre =
+      dgeneralInfo?.dependencia || user?.dgeneral_nombre || "";
+    const depAuxNombre =
+      dauxiliarInfo?.dependencia || user?.dauxiliar_nombre || "";
 
-    setVal("dependencia", "");
+    setVal("dependencia", depGenNombre);
+    setVal("dependencia_aux", depAuxNombre);
+
+    updateClaveProgramatica();
   }
 
   // ---------------------------
-  // Combos: Proyectos, Fuentes, Programas
+  // Proyectos desde catálogo (CLAVE + CONAC + DESCRIPCIÓN)
+  // ---------------------------
+  async function loadProyectosCatalog() {
+    const data = await fetchJson(`${API}/api/catalogos/proyectos`, {
+      headers: { ...authHeaders() },
+    });
+
+    proyectosById = {};
+    const items = Array.isArray(data) ? data : [];
+
+    items.forEach((p) => {
+      const id = Number(p.id);
+      if (!Number.isFinite(id)) return;
+
+      proyectosById[id] = {
+        id,
+        clave: String(p.clave ?? "").trim(),
+        conac: String(p.conac ?? "").trim(),
+        descripcion: String(p.descripcion ?? "").trim(),
+      };
+    });
+
+    const sel = document.querySelector('[name="id_proyecto"]');
+    if (!sel) return;
+
+    sel.innerHTML = `<option value="">-- Selecciona un proyecto --</option>`;
+
+    Object.values(proyectosById).forEach((p) => {
+      const opt = document.createElement("option");
+      const clave = String(p.clave || "").trim();
+      const conac = String(p.conac || "").trim();
+      const claveConac = conac ? `${clave} ${conac}` : clave;
+
+      opt.value = String(p.id);
+      opt.textContent = `${claveConac} - ${p.descripcion}`.trim();
+      sel.appendChild(opt);
+    });
+  }
+
+  // ---------------------------
+  // Fuentes
   // ---------------------------
   function setOptions(selectName, items, getValue, getLabel) {
     const sel = document.querySelector(`[name="${selectName}"]`);
@@ -186,35 +316,6 @@
       opt.textContent = String(getLabel(it) ?? "");
       sel.appendChild(opt);
     }
-  }
-
-  async function loadProyectosProgramaticos() {
-    const user = getLoggedUser();
-
-    const roles = Array.isArray(user?.roles) ? user.roles : [];
-    const rolesNorm = roles.map((r) => String(r).trim().toUpperCase());
-    const isArea = rolesNorm.includes("AREA");
-    const myIdDg = user?.id_dgeneral != null ? Number(user.id_dgeneral) : null;
-
-    const data = await fetchJson(`${API}/api/projects`, {
-      headers: { ...authHeaders() },
-    });
-
-    let projects = Array.isArray(data) ? data : [];
-
-    if (isArea && myIdDg != null) {
-      projects = projects.filter((p) => {
-        const projIdDg = p.id_dgeneral != null ? Number(p.id_dgeneral) : null;
-        return projIdDg === myIdDg;
-      });
-    }
-
-    setOptions(
-      "id_proyecto_programatico",
-      projects,
-      (p) => p.project,
-      (p) => p.project
-    );
   }
 
   async function loadFuentesCatalog() {
@@ -231,20 +332,26 @@
     );
   }
 
-  async function loadProgramasCatalog() {
-    const data = await fetchJson(`${API}/api/catalogos/programas`, {
-      headers: { ...authHeaders() },
-    });
+  // ---------------------------
+  // ✅ Clave programática (DG + DA + PROYECTO(CLAVE + CONAC))
+  // ---------------------------
+  function updateClaveProgramatica() {
+    const idProyecto = Number(get("id_proyecto") || 0);
+    const p = proyectosById[idProyecto];
 
-    setOptions(
-      "programa",
-      data,
-      (x) => x.id,
-      (x) =>
-        `${String(x.clave ?? "").trim()} - ${String(
-          x.descripcion ?? ""
-        ).trim()}`
-    );
+    const dg = dgeneralInfo?.clave ? String(dgeneralInfo.clave).trim() : "";
+    const da = dauxiliarInfo?.clave ? String(dauxiliarInfo.clave).trim() : "";
+
+    const projClave = p ? String(p.clave || "").trim() : "";
+    const projConac = p ? String(p.conac || "").trim() : "";
+
+    const projClaveConac = projConac ? `${projClave} ${projConac}` : projClave;
+
+    const claveProg = [dg, da, projClaveConac].filter(Boolean).join(" ");
+    setVal("clave_programatica", claveProg);
+
+    const descEl = document.getElementById("claveProgDesc");
+    if (descEl) descEl.textContent = p?.descripcion || "—";
   }
 
   // ---------------------------
@@ -354,7 +461,7 @@
   }
 
   // ---------------------------
-  // Subtotal + IVA/ISR + Total + letra
+  // Totales + letras
   // ---------------------------
   function buildDetalle() {
     const rows = [];
@@ -362,7 +469,7 @@
 
     for (let i = 1; i <= n; i++) {
       rows.push({
-        no: i,
+        renglon: i,
         clave: get(`r${i}_clave`),
         concepto_partida: get(`r${i}_concepto`),
         justificacion: get(`r${i}_justificacion`),
@@ -394,7 +501,6 @@
   }
 
   function getIsrRate() {
-    // convierte porcentaje a decimal: 10 => 0.10
     return getIsrPercent() / 100;
   }
 
@@ -406,12 +512,8 @@
     let iva = 0;
     let isr = 0;
 
-    if (tipo === "IVA") {
-      iva = subtotal * 0.16;
-    } else if (tipo === "ISR") {
-      const rate = getIsrRate(); // 10 -> 0.10
-      isr = subtotal * rate;
-    }
+    if (tipo === "IVA") iva = subtotal * 0.16;
+    else if (tipo === "ISR") isr = subtotal * getIsrRate();
 
     const total = subtotal + iva + isr;
 
@@ -423,7 +525,6 @@
     setVal("cantidad_con_letra", numeroALetrasMX(total));
   }
 
-  // Listener: importes + clave->concepto
   document.addEventListener("input", (e) => {
     if (e.target && e.target.classList.contains("sp-importe")) {
       refreshTotales();
@@ -463,7 +564,6 @@
 
     const letras = numeroALetras(entero);
     const cent = String(centavos).padStart(2, "0");
-
     return `${letras} PESOS ${cent}/100 M.N.`;
   }
 
@@ -531,16 +631,11 @@
       const u = du % 10;
 
       if (c) out += centenas[c] + " ";
-
-      if (du >= 10 && du <= 19) {
-        out += decenas10[du - 10];
-        return out.trim();
-      }
-
-      if (d === 2 && u !== 0) {
-        out += "VEINTI" + unidades[u].toLowerCase();
-        return out.toUpperCase().trim();
-      }
+      if (du >= 10 && du <= 19) return (out + decenas10[du - 10]).trim();
+      if (d === 2 && u !== 0)
+        return (out + ("VEINTI" + unidades[u].toLowerCase()))
+          .toUpperCase()
+          .trim();
 
       if (d) {
         out += decenas[d];
@@ -557,10 +652,7 @@
       const m = Math.floor(n / 1000);
       const r = n % 1000;
 
-      let out = "";
-      if (m === 1) out = "MIL";
-      else out = seccion(m) + " MIL";
-
+      let out = m === 1 ? "MIL" : seccion(m) + " MIL";
       if (r) out += " " + seccion(r);
       return out.trim();
     }
@@ -570,10 +662,7 @@
       const m = Math.floor(n / 1_000_000);
       const r = n % 1_000_000;
 
-      let out = "";
-      if (m === 1) out = "UN MILLÓN";
-      else out = miles(m) + " MILLONES";
-
+      let out = m === 1 ? "UN MILLÓN" : miles(m) + " MILLONES";
       if (r) out += " " + miles(r);
       return out.trim();
     }
@@ -591,19 +680,15 @@
     radios.forEach((r) => {
       r.addEventListener("change", () => {
         const tipo = getImpuestoTipo();
-
         if (isrInput) {
           isrInput.disabled = tipo !== "ISR";
-
           if (tipo === "ISR" && !isrInput.value) isrInput.value = "10";
         }
-
         refreshTotales();
       });
     });
 
     isrInput?.addEventListener("input", refreshTotales);
-
     if (isrInput) isrInput.disabled = getImpuestoTipo() !== "ISR";
   }
 
@@ -611,43 +696,64 @@
   // Guardado (API)
   // ---------------------------
   function buildPayload() {
-    const detalle = buildDetalle();
-    const subtotal = calcSubtotal(detalle);
+    const user = getLoggedUser();
 
-    const impuesto_tipo = getImpuestoTipo();
-    const isr_tasa = getIsrRate();
+    const id_usuario = user?.id != null ? Number(user.id) : null;
 
-    const iva = safeNumber(get("iva"));
-    const isr = safeNumber(get("isr"));
-    const total = safeNumber(get("total"));
+    const id_proyecto = get("id_proyecto") ? Number(get("id_proyecto")) : null;
 
+    
+    
+    // en tu HTML el select se llama name="fuente"
+    const id_fuente = get("fuente") ? Number(get("fuente")) : null;
+    
+    // texto visible del combo (ej "150101 - Recurso Estatal")
+    const fuenteText =
+    document.querySelector('[name="fuente"]')?.selectedOptions?.[0]?.textContent?.trim() || "";
+    
     return {
-      fecha: get("fecha"),
-      dependencia: get("dependencia"),
+      id_usuario,
+      id_dgeneral: get("id_dgeneral") ? Number(get("id_dgeneral")) : null,
+      id_dauxiliar: get("id_dauxiliar") ? Number(get("id_dauxiliar")) : null,
+      
+      id_proyecto,
+      id_fuente,
+      
+      // columnas que sí existen en tu tabla
+      no_suficiencia: get("no_suficiencia") || null,
+      fecha: get("fecha") || null,
+      dependencia: get("dependencia") || null,
+      mes_pago: get("mes_pago") || null,
 
-      id_proyecto_programatico: get("id_proyecto_programatico"),
-      id_fuente: get("fuente"),
-      id_programa: get("programa"),
+      clave_programatica: get("clave_programatica") || null,
 
-      mes_pago: get("mes_pago"),
-      cantidad_pago: get("cantidad_pago"),
-
-      impuesto_tipo,
-      isr_tasa,
-      subtotal,
-      iva,
-      isr,
-      total,
-
-      meta: get("meta"),
-      cantidad_con_letra: get("cantidad_con_letra"),
-      detalle,
+      total: safeNumber(get("total")),
+      cantidad_con_letra: get("cantidad_con_letra") || "",
+      
+      // si quieres guardar también el texto de fuente:
+      fuente: fuenteText,
+      
+      // detalle con columnas reales (renglon)
+      detalle: buildDetalle(), // buildDetalle debe usar renglon
     };
   }
 
   async function save() {
     refreshTotales();
     const payload = buildPayload();
+
+    // ✅ VALIDACIONES FRONT
+    if (!payload.id_usuario) {
+      throw new Error(
+        "No se detectó el usuario logueado (cp_usuario). Vuelve a iniciar sesión."
+      );
+    }
+    if (!payload.id_proyecto) {
+      throw new Error("Selecciona un PROYECTO antes de guardar.");
+    }
+    if (!payload.id_fuente) {
+      throw new Error("Selecciona una FUENTE antes de guardar.");
+    }
 
     const data = await fetchJson(`${API}/api/suficiencias`, {
       method: "POST",
@@ -658,7 +764,6 @@
       body: JSON.stringify(payload),
     });
 
-    // ✅ IMPORTANTE: validar id
     if (!data?.id) {
       console.error("[SP] Respuesta sin id:", data);
       throw new Error("El servidor no devolvió el ID del registro.");
@@ -666,14 +771,7 @@
 
     lastSavedId = data.id;
 
-    // ✅ habilita botón comprometido SIEMPRE
-    if (btnVerComprometido) {
-      btnVerComprometido.disabled = false;
-      btnVerComprometido.dataset.id = String(lastSavedId);
-      btnVerComprometido.classList.remove("disabled");
-    }
-
-    // guarda snapshot en localStorage
+    // Guarda último registro
     try {
       localStorage.setItem(
         "cp_last_suficiencia",
@@ -684,31 +782,26 @@
           payload,
         })
       );
-    } catch (e) {
-      console.warn("[SP] No se pudo guardar cp_last_suficiencia:", e);
-    }
+    } catch {}
 
+    // Folio visual
     if (data.folio_num != null) {
       setVal("no_suficiencia", String(data.folio_num).padStart(6, "0"));
     }
 
-    if (btnDescargarExcel) {
-      btnDescargarExcel.classList.remove("disabled");
-      btnDescargarExcel.href = `${API}/api/suficiencias/${lastSavedId}/excel`;
+    // Habilita comprometido
+    if (btnVerComprometido) {
+      btnVerComprometido.disabled = false;
+      btnVerComprometido.dataset.id = String(lastSavedId);
+      btnVerComprometido.classList.remove("disabled");
     }
 
-    alert("Guardado correctamente. Ya puedes descargar el Excel.");
+    alert("Guardado correctamente.");
+    return data;
   }
 
   // ---------------------------
-  // PDF (tu misma lógica - aquí la dejas igual)
-  // ---------------------------
-  // ... (NO LA TOCO para no romper tus campos)
-  // ⛔️ OJO: aquí NO la copio para no duplicar; deja tu sección PDF tal cual.
-  // (Si quieres, te la integro completa también, pero no afecta al botón)
-
-  // ---------------------------
-  // VER COMPROMETIDO ✅ ROBUSTO
+  // VER COMPROMETIDO
   // ---------------------------
   function readLastIdFromLocalStorage() {
     try {
@@ -722,8 +815,167 @@
 
   function goComprometido(id) {
     if (!id) return;
-    // ✅ mejor que window.open (evita bloqueos)
     window.location.href = `comprometido.html?id=${encodeURIComponent(id)}`;
+  }
+
+  // ---------------------------
+  // PDF SUFICIENCIA (pdf-lib)
+  // ---------------------------
+  async function fetchPdfTemplateBytesSuf() {
+    const r = await fetch(SUF_PDF_TEMPLATE_URL);
+    if (!r.ok)
+      throw new Error(
+        `No se pudo cargar la plantilla PDF: ${SUF_PDF_TEMPLATE_URL}`
+      );
+    return await r.arrayBuffer();
+  }
+
+  async function debugListPdfFields() {
+    const bytes = await fetchPdfTemplateBytesSuf();
+    const pdfDoc = await PDFLib.PDFDocument.load(bytes);
+    const form = pdfDoc.getForm();
+    console.log(
+      "[PDF] Campos:",
+      form.getFields().map((f) => f.getName())
+    );
+  }
+
+  async function generarPDF() {
+    refreshTotales();
+
+    if (!window.PDFLib?.PDFDocument) {
+      throw new Error(
+        "Falta pdf-lib. Revisa que el script de pdf-lib cargue antes."
+      );
+    }
+
+    const payload = {
+      fecha: get("fecha"),
+      dependencia: get("dependencia"),
+      fuente: get("fuente"),
+      mes_pago: get("mes_pago"),
+      subtotal: get("subtotal"),
+      iva: get("iva"),
+      isr: get("isr"),
+      total: get("total"),
+      cantidad_con_letra: get("cantidad_con_letra"),
+      meta: get("meta"),
+      clave_programatica: get("clave_programatica"),
+      detalle: buildDetalle(),
+      folio_num: get("no_suficiencia"),
+    };
+
+    const templateBytes = await fetchPdfTemplateBytesSuf();
+    const pdfDoc = await PDFLib.PDFDocument.load(templateBytes);
+    const form = pdfDoc.getForm();
+
+    const setTextSafe = (fieldName, value) => {
+      try {
+        const f = form.getTextField(fieldName);
+        f.setText(String(value ?? ""));
+      } catch {}
+    };
+
+    const safeN = (x) => {
+      const n = Number(x);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    function splitFechaParts(iso) {
+      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso))
+        return { d: "", m: "", y: "" };
+      const [y, m, d] = iso.split("-");
+      return { d, m, y };
+    }
+
+    // CABECERA
+    setTextSafe("NOMBRE DE LA DEPENDENCIA GENERAL:", payload.dependencia || "");
+    setTextSafe(
+      "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
+      payload.clave_programatica || ""
+    );
+    setTextSafe(
+      "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
+      payload.clave_programatica || ""
+    );
+
+    const fuenteSel = document.querySelector('[name="fuente"]');
+    const fuenteText = fuenteSel?.selectedOptions?.[0]?.textContent || "";
+
+    setTextSafe("FUENTE DE FINANCIAMIENTO", String(payload.fuente || ""));
+    setTextSafe("NOMBRE F.F", String(fuenteText || ""));
+
+    const { d, m, y } = splitFechaParts(payload.fecha);
+    setTextSafe("fechadia", d);
+    setTextSafe("fechames", m);
+    setTextSafe("fechayear", y);
+
+    // PROGRAMACIÓN DE PAGO
+    const mesSel = String(payload.mes_pago || "")
+      .trim()
+      .toUpperCase();
+    const totalTxt = safeN(payload.total).toFixed(2);
+    const meses = [
+      "ENERO",
+      "FEBRERO",
+      "MARZO",
+      "ABRIL",
+      "MAYO",
+      "JUNIO",
+      "JULIO",
+      "AGOSTO",
+      "SEPTIEMBRE",
+      "OCTUBRE",
+      "NOVIEMBRE",
+      "DICIEMBRE",
+    ];
+    for (const mes of meses) {
+      setTextSafe(`${mes}PROGRAMACIÓN DE PAGO`, mes === mesSel ? totalTxt : "");
+    }
+
+    // DETALLE
+    const detalle = payload.detalle || [];
+    setTextSafe("No", detalle.map((r) => r.renglon).join("\n"));
+    setTextSafe("CLAVE", detalle.map((r) => r.clave || "").join("\n"));
+    setTextSafe(
+      "CONCEPTO DE PARTIDA",
+      detalle.map((r) => r.concepto_partida || "").join("\n")
+    );
+    setTextSafe(
+      "JUSTIFICACIÓN",
+      detalle.map((r) => r.justificacion || "").join("\n")
+    );
+    setTextSafe(
+      "DESCRIPCIÓN",
+      detalle.map((r) => r.descripcion || "").join("\n")
+    );
+    setTextSafe(
+      "IMPORTE",
+      detalle.map((r) => safeN(r.importe).toFixed(2)).join("\n")
+    );
+
+    // TOTALES
+    setTextSafe("subtotal", safeN(payload.subtotal).toFixed(2));
+    setTextSafe("IVA", safeN(payload.iva).toFixed(2));
+    setTextSafe("ISR", safeN(payload.isr).toFixed(2));
+    setTextSafe("total", safeN(payload.total).toFixed(2));
+    setTextSafe("CANTIDAD CON LETRA:", payload.cantidad_con_letra || "");
+    setTextSafe("Meta", payload.meta || "");
+
+    form.flatten();
+
+    const outBytes = await pdfDoc.save();
+    const blob = new Blob([outBytes], { type: "application/pdf" });
+    const url = URL.createObjectURL(blob);
+
+    const folio = String(payload.folio_num || "").padStart(6, "0") || "000000";
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `SUFICIENCIA_${folio}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
   }
 
   // ---------------------------
@@ -733,7 +985,6 @@
     btnAddRow?.addEventListener("click", addRow);
     btnRemoveRow?.addEventListener("click", removeRow);
 
-    // 👇 evita submit del form sí o sí
     if (btnVerComprometido) btnVerComprometido.type = "button";
     if (btnGuardar) btnGuardar.type = "button";
     if (btnSi) btnSi.type = "button";
@@ -758,38 +1009,78 @@
       }
     });
 
-    btnDescargarPdf?.addEventListener("click", (e) => {
+    btnDescargarPdf?.addEventListener("click", async (e) => {
       e.preventDefault();
-      // aquí llama tu generarPDF()
-      if (typeof generarPDF === "function") generarPDF();
-      else console.warn("[SP] generarPDF() no está en scope (revisa el orden)");
+      try {
+        await generarPDF();
+      } catch (err) {
+        console.error("[SP] PDF error:", err);
+        alert(err.message || "Error al generar PDF");
+      }
     });
 
     btnVerComprometido?.addEventListener("click", (e) => {
       e.preventDefault();
 
-      // 1) dataset
       let id = btnVerComprometido.dataset.id
         ? Number(btnVerComprometido.dataset.id)
         : null;
-
-      // 2) lastSavedId
       if (!id && lastSavedId) id = Number(lastSavedId);
-
-      // 3) localStorage
       if (!id) id = readLastIdFromLocalStorage();
-
-      console.log("[SP] Ver comprometido id =", id);
 
       if (!id) {
         alert("Primero guarda la Suficiencia para generar el Comprometido.");
         return;
       }
-
       goComprometido(id);
     });
 
+    document
+      .querySelector('[name="id_proyecto"]')
+      ?.addEventListener("change", updateClaveProgramatica);
+
     bindTaxEvents();
+
+    if (DEBUG_PDF_FIELDS) {
+      debugListPdfFields().catch((err) =>
+        console.warn("[PDF debug] ", err.message)
+      );
+    }
+
+    // ---------------------------
+    // ✅ NUEVO: Eventos BUSCADOR
+    // ---------------------------
+    btnToggleBuscar?.addEventListener("click", () => {
+      if (!panelBuscar) return;
+      const isShown = panelBuscarEl.classList.contains("show");
+      if (isShown) panelBuscar.hide();
+      else panelBuscar.show();
+    });
+
+    btnCerrarBuscar?.addEventListener("click", () => panelBuscar?.hide());
+    btnCerrarBuscar2?.addEventListener("click", () => panelBuscar?.hide());
+
+    btnBuscarNumero?.addEventListener("click", async () => {
+      try {
+        const n = txtNumeroSuf?.value || "";
+        if (!String(n).trim()) return alert("Escribe el número de suficiencia.");
+        await buscarPorNumero(n);
+      } catch (err) {
+        console.error("[BUSCAR] error:", err);
+        alert(err.message || "Error al buscar");
+      }
+    });
+
+    btnBuscarClaves?.addEventListener("click", async () => {
+  alert("Búsqueda por Dep + Programática: pendiente (aún no está implementada en el backend). Usa búsqueda por número.");
+});
+
+    txtNumeroSuf?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") btnBuscarNumero?.click();
+    });
+    txtProgClave?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") btnBuscarClaves?.click();
+    });
   }
 
   // ---------------------------
@@ -808,17 +1099,10 @@
     bindEvents();
 
     try {
-      await setDependenciaReadonly();
-    } catch (e) {
-      console.warn("[SP] dependencia:", e.message);
-    }
-
-    try {
       await loadPartidasCatalog();
     } catch (e) {
       console.warn("[SP] catálogo partidas:", e.message);
     }
-
     try {
       await loadNextFolio();
     } catch (e) {
@@ -826,25 +1110,21 @@
     }
 
     try {
-      await loadProyectosProgramaticos();
+      await loadDependenciasFromUser();
     } catch (e) {
-      console.error("[SP] proyectos:", e.message);
-      alert("No se pudieron cargar los PROYECTOS. Revisa consola (F12).");
+      console.warn("[SP] dependencias:", e.message);
     }
-
+    try {
+      await loadProyectosCatalog();
+    } catch (e) {
+      console.warn("[SP] proyectos:", e.message);
+    }
     try {
       await loadFuentesCatalog();
     } catch (e) {
       console.warn("[SP] fuentes:", e.message);
     }
 
-    try {
-      await loadProgramasCatalog();
-    } catch (e) {
-      console.warn("[SP] programas:", e.message);
-    }
-
-    // ✅ Si hay último guardado, habilita botón al entrar
     try {
       const lastId = readLastIdFromLocalStorage();
       if (btnVerComprometido && lastId) {
@@ -855,6 +1135,7 @@
     } catch {}
 
     refreshTotales();
+    updateClaveProgramatica();
   }
 
   if (document.readyState === "loading") {

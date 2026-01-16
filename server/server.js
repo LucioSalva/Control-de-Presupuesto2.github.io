@@ -35,7 +35,15 @@ app.use(express.json());
 // =====================================================
 //  STATIC (FRONTEND)
 // =====================================================
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"))); // server/public (si lo usas)
+
+// ✅ Sirve la carpeta public de la RAÍZ del proyecto (la de tu imagen)
+app.use("/public", express.static(path.join(__dirname, "..", "public")));
+
+// ✅ Opcional: si quieres que /PDF/... funcione directo
+app.use("/PDF", express.static(path.join(__dirname, "..", "public", "PDF")));
+
+// tus folders de raíz ya los estás sirviendo así:
 app.use("/css", express.static(path.join(__dirname, "..", "css")));
 app.use("/js", express.static(path.join(__dirname, "..", "js")));
 
@@ -66,30 +74,37 @@ async function authRequired(req, res, next) {
     const { userId } = parsed;
 
     const sql = `
-      SELECT u.id,
-             u.activo,
-             ARRAY(
-               SELECT r.clave
-               FROM usuario_rol ur
-               JOIN roles r ON r.id = ur.id_rol
-               WHERE ur.id_usuario = u.id
-             ) AS roles
-      FROM usuarios u
-      WHERE u.id = $1
-      LIMIT 1;
-    `;
+  SELECT u.id,
+         u.activo,
+         u.id_dgeneral,
+         u.id_dauxiliar,
+         ARRAY(
+           SELECT r.clave
+           FROM usuario_rol ur
+           JOIN roles r ON r.id = ur.id_rol
+           WHERE ur.id_usuario = u.id
+         ) AS roles
+  FROM usuarios u
+  WHERE u.id = $1
+  LIMIT 1;
+`;
+
+
     const r = await query(sql, [userId]);
 
-    if (r.rowCount === 0) return res.status(401).json({ error: "Token inválido" });
+    if (r.rowCount === 0)
+      return res.status(401).json({ error: "Token inválido" });
 
     const user = r.rows[0];
-    if (!user.activo) return res.status(403).json({ error: "Usuario inactivo" });
+    if (!user.activo)
+      return res.status(403).json({ error: "Usuario inactivo" });
 
-    const roles = Array.isArray(user.roles) ? user.roles : [];
     req.user = {
-      id: user.id,
-      roles: roles.map((x) => String(x).trim().toUpperCase()),
-    };
+  id: user.id,
+  id_dgeneral: user.id_dgeneral,
+  id_dauxiliar: user.id_dauxiliar,
+  roles: roles.map((x) => String(x).trim().toUpperCase()),
+};
 
     next();
   } catch (e) {
@@ -114,7 +129,8 @@ function blockPartidasWrite(req, res, next) {
 
   if (!isGodOrAdmin(req)) {
     return res.status(403).json({
-      error: "AREA no puede modificar el catálogo de partidas (solo GOD/ADMIN).",
+      error:
+        "AREA no puede modificar el catálogo de partidas (solo GOD/ADMIN).",
     });
   }
   next();
@@ -131,7 +147,7 @@ app.use("/api", authRouter);
 app.use("/api/admin/usuarios", adminUsuariosRouter);
 
 // Suficiencias
-app.use("/api/suficiencias", suficienciasRouter);
+app.use("/api/suficiencias", authRequired, suficienciasRouter);
 
 // Comprometido (solo lectura)
 app.use("/api/comprometido", comprometidoRouter);

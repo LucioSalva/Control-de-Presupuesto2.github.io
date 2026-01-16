@@ -71,13 +71,13 @@
           </a>
         </li> -->
       </ul>
-      <button id="btn-export-xlsx" class="btn btn-outline-success btn-sm">
+      <!-- <button id="btn-export-xlsx" class="btn btn-outline-success btn-sm">
         <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
       </button>
 
       <button id="btn-reset" class="btn btn-outline-danger btn-sm">
         <i class="bi bi-eraser me-1"></i>Reiniciar
-      </button>
+      </button> -->
     </div>
   </nav>
 
@@ -99,9 +99,91 @@
         <i class="bi bi-box-arrow-up-right me-1"></i>Ver comprometido
       </button>
 
+      <!-- BOTÓN BUSCAR -->
+<div class="d-flex justify-content-end mb-2">
+  <button id="btnToggleBuscar" class="btn btn-outline-primary">
+    <i class="bi bi-search me-1"></i> Buscar suficiencia
+  </button>
+</div>
+
+<!-- PANEL DESPLEGABLE -->
+<div class="collapse" id="panelBuscarSuf">
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+
+      <!-- Tabs simples -->
+      <ul class="nav nav-pills mb-3" id="buscarTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="tab-num" data-bs-toggle="pill"
+                  data-bs-target="#pane-num" type="button" role="tab">
+            # Suficiencia
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="tab-claves" data-bs-toggle="pill"
+                  data-bs-target="#pane-claves" type="button" role="tab">
+            Dep + Programática
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+
+        <!-- Buscar por número -->
+        <div class="tab-pane fade show active" id="pane-num" role="tabpanel">
+          <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+              <label class="form-label mb-1">Número de suficiencia</label>
+              <input id="txtNumeroSuf" class="form-control" placeholder="000005" maxlength="10">
+              <div class="form-text">Ejemplo: 000005</div>
+            </div>
+            <div class="col-md-8 d-flex gap-2">
+              <button id="btnBuscarNumero" class="btn btn-primary">
+                <i class="bi bi-search me-1"></i> Buscar
+              </button>
+              <button id="btnCerrarBuscar" class="btn btn-outline-secondary">
+                <i class="bi bi-x-lg me-1"></i> Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Buscar por dep + programática -->
+        <div class="tab-pane fade" id="pane-claves" role="tabpanel">
+          <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+              <label class="form-label mb-1">Clave de dependencia</label>
+              <input id="txtDepClave" class="form-control" placeholder="L00" maxlength="20">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label mb-1">Clave programática</label>
+              <input id="txtProgClave" class="form-control" placeholder="010101..." maxlength="80">
+            </div>
+            <div class="col-md-4 d-flex gap-2">
+              <button id="btnBuscarClaves" class="btn btn-primary">
+                <i class="bi bi-search me-1"></i> Buscar
+              </button>
+              <button id="btnCerrarBuscar2" class="btn btn-outline-secondary">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-text mt-2">
+            * Para usuarios AREA, aunque busques algo de otra área, no aparecerá (candado).
+          </div>
+        </div>
+
+      </div>
+
     </div>
   </div>
+</div>
 
+    </div>
+
+  </div>
+  
   <div class="form-container">
     <div class="row mb-3">
       <div class="col-3 text-center">
@@ -126,76 +208,90 @@
     </div>
 
     <!-- Datos generales -->
-    <!-- Datos generales -->
     <table class="table table-bordered mb-2">
-      <!-- ROW 1: Dependencia + Fecha -->
-      <tr>
-        <th class="table-header" style="width:15%;">NOMBRE DE LA DEPENDENCIA GENERAL:</th>
-        <td style="width:35%;">
-          <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia"
-            readonly>
-        </td>
+  <!-- ROW 1: SOLO FECHA (pegada a la derecha) -->
+  <tr>
+    <th class="table-header" style="width:15%;">FECHA DE ELABORACIÓN:</th>
+    <td style="width:85%;">
+      <input type="date" class="form-control form-control-sm as-text text-strong td-text" name="fecha" readonly>
+    </td>
+  </tr>
 
-        <th class="table-header" style="width:15%;">FECHA DE ELABORACIÓN:</th>
-        <td style="width:35%;">
-          <input type="date" class="form-control form-control-sm as-text text-strong td-text" name="fecha" readonly>
-        </td>
-      </tr>
+  <!-- ROW 2: Dependencia general (usuario) -->
+  <tr>
+    <th class="table-header" style="width:15%;">NOMBRE DE LA DEPENDENCIA GENERAL:</th>
+    <td style="width:85%;">
+      <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia" readonly>
+      <input type="hidden" name="id_dgeneral">
+    </td>
+  </tr>
 
-      <!-- ROW 2: Clave programática (proyectos) + Programa -->
-      <tr>
-        <th class="table-header">CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:</th>
-        <td>
-          <select class="form-select form-select-sm" name="id_proyecto_programatico">
-            <option value="">-- Selecciona un proyecto --</option>
-          </select>
-        </td>
+  <!-- ROW 3: Dependencia auxiliar (usuario) -->
+  <tr>
+    <th class="table-header" style="width:15%;">NOMBRE DE LA DEPENDENCIA AUXILIAR:</th>
+    <td style="width:85%;">
+      <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia_aux" readonly>
+      <input type="hidden" name="id_dauxiliar">
+    </td>
+  </tr>
 
-        <th class="table-header">PROGRAMA:</th>
-        <td>
-          <select class="form-select form-select-sm" name="programa">
-            <option value="">-- Selecciona un programa --</option>
-          </select>
-        </td>
-      </tr>
+  <!-- ROW 4: Proyecto (combo: CLAVE + CONAC + DESCRIPCIÓN) -->
+  <tr>
+    <th class="table-header" style="width:15%;">PROYECTO:</th>
+    <td style="width:85%;">
+      <select class="form-select form-select-sm" name="id_proyecto">
+        <option value="">-- Selecciona un proyecto --</option>
+      </select>
+    </td>
+  </tr>
 
-      <!-- ROW 3: Fuente + Mes pago -->
-      <tr>
-        <th class="table-header">FUENTE DE FINANCIAMIENTO:</th>
-        <td>
-          <select class="form-select form-select-sm" name="fuente">
-            <option value="">-- Selecciona una fuente --</option>
-          </select>
-        </td>
+  <!-- ROW 5: Clave programática (auto) + descripción abajo en la misma celda -->
+  <tr>
+    <th class="table-header" style="width:15%;">CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:</th>
+    <td style="width:85%;">
+      <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="clave_programatica" readonly>
+      <div class="small mt-1 text-muted" id="claveProgDesc">—</div>
+    </td>
+  </tr>
 
-        <th class="table-header" style="background-color: rgb(180, 180, 180);;">PROGRAMACIÓN DE PAGO:</th>
-        <td>
-          <div class="d-flex gap-2 align-items-center">
-            <select class="form-select form-select-sm" name="mes_pago">
-              <option value="ENERO">ENERO</option>
-              <option value="FEBRERO">FEBRERO</option>
-              <option value="MARZO">MARZO</option>
-              <option value="ABRIL">ABRIL</option>
-              <option value="MAYO">MAYO</option>
-              <option value="JUNIO">JUNIO</option>
-              <option value="JULIO">JULIO</option>
-              <option value="AGOSTO">AGOSTO</option>
-              <option value="SEPTIEMBRE">SEPTIEMBRE</option>
-              <option value="OCTUBRE">OCTUBRE</option>
-              <option value="NOVIEMBRE">NOVIEMBRE</option>
-              <option value="DICIEMBRE">DICIEMBRE</option>
-            </select>
+  <!-- ROW 6: Fuente + Programación de pago (NO TOCAR) -->
+  <tr>
+    <th class="table-header">FUENTE DE FINANCIAMIENTO:</th>
+    <td>
+      <select class="form-select form-select-sm" name="fuente">
+        <option value="">-- Selecciona una fuente --</option>
+      </select>
+      <input type="hidden" name="id_fuente">
+    </td>
+  </tr>
 
-            <!-- CANTIDAD (solo números) -->
-            <input type="text" class="form-control form-control-sm as-text td-text text-strong text-end input-no-click"
-              name="cantidad_pago" placeholder="Cantidad" readonly>
+  <tr>
+    <th class="table-header" style="background-color: rgb(180, 180, 180);">PROGRAMACIÓN DE PAGO:</th>
+    <td>
+      <div class="d-flex gap-2 align-items-center">
+        <select class="form-select form-select-sm" name="mes_pago">
+          <option value="ENERO">ENERO</option>
+          <option value="FEBRERO">FEBRERO</option>
+          <option value="MARZO">MARZO</option>
+          <option value="ABRIL">ABRIL</option>
+          <option value="MAYO">MAYO</option>
+          <option value="JUNIO">JUNIO</option>
+          <option value="JULIO">JULIO</option>
+          <option value="AGOSTO">AGOSTO</option>
+          <option value="SEPTIEMBRE">SEPTIEMBRE</option>
+          <option value="OCTUBRE">OCTUBRE</option>
+          <option value="NOVIEMBRE">NOVIEMBRE</option>
+          <option value="DICIEMBRE">DICIEMBRE</option>
+        </select>
 
+        <input type="text"
+          class="form-control form-control-sm as-text td-text text-strong text-end input-no-click"
+          name="cantidad_pago" placeholder="Cantidad" readonly>
+      </div>
+    </td>
+  </tr>
+</table>
 
-          </div>
-        </td>
-
-      </tr>
-    </table>
 
 
     <!-- Justificación general

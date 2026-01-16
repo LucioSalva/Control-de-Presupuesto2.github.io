@@ -55,27 +55,31 @@ router.get("/programas", async (_req, res) => {
   }
 });
 
-router.get("/proyectos", async (_req, res) => {
+router.get("/partidas", async (req, res) => {
   try {
-    const r = await query(
-      `SELECT id, clave, descripcion FROM proyectos ORDER BY clave`
-    );
+    const r = await query(`
+      SELECT clave, descripcion
+      FROM public.partidas
+      ORDER BY clave
+    `);
     res.json(r.rows);
   } catch (e) {
-    console.error("GET /catalogos/proyectos", e);
-    res.status(500).json({ error: "Error obteniendo catálogo proyectos" });
+    console.error("GET /api/catalogos/partidas", e);
+    res.status(500).json({ error: "Error obteniendo partidas" });
   }
 });
 
-router.get("/partidas", async (_req, res) => {
+router.get("/proyectos", async (req, res) => {
   try {
-    const r = await query(
-      `SELECT id, clave, descripcion FROM partidas ORDER BY clave`
-    );
+    const r = await query(`
+      SELECT id, clave, conac, descripcion
+      FROM public.proyectos
+      ORDER BY clave
+    `);
     res.json(r.rows);
   } catch (e) {
-    console.error("GET /catalogos/partidas", e);
-    res.status(500).json({ error: "Error obteniendo catálogo partidas" });
+    console.error("GET /api/catalogos/proyectos", e);
+    res.status(500).json({ error: "Error obteniendo proyectos" });
   }
 });
 
