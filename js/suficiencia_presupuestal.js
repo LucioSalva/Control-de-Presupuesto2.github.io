@@ -1,4 +1,3 @@
-
 (() => {
   const MAX_ROWS = 20;
   const START_ROWS = 3;
@@ -19,6 +18,7 @@
   const btnSi = document.getElementById("btn-si-seguro");
   const btnDescargarPdf = document.getElementById("btn-descargar-pdf");
   const btnVerComprometido = document.getElementById("btn-ver-comprometido");
+  const btnVerDevengado = document.getElementById("btn-ver-devengado");
 
   // OJO: en tu HTML el botón es btn-export-xlsx
   const btnExportXlsx = document.getElementById("btn-export-xlsx");
@@ -31,7 +31,7 @@
   const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
 
   // ---------------------------
-  // ✅ NUEVO: BUSCADOR (botón + panel)
+  // ✅ BUSCADOR (botón + panel)
   // ---------------------------
   const btnToggleBuscar = document.getElementById("btnToggleBuscar");
   const panelBuscarEl = document.getElementById("panelBuscarSuf");
@@ -124,7 +124,7 @@
   }
 
   // ---------------------------
-  // ✅ NUEVO: Helpers / funciones BUSCADOR
+  // ✅ Helpers / funciones BUSCADOR
   // ---------------------------
   function pad6(value) {
     const v = String(value || "").trim();
@@ -133,8 +133,6 @@
     return v;
   }
 
-  // ✅ No tocamos tu UI: por ahora solo consola + alert.
-  // Si quieres, luego lo conectamos a una tabla / modal.
   function renderResultadosBusqueda(rows) {
     console.log("[BUSCAR] resultados:", rows);
 
@@ -144,15 +142,25 @@
     }
 
     const folios = rows
-      .map((r) => String(r.no_suficiencia ?? r.folio_num ?? r.numero_suficiencia ?? "").trim())
+      .map((r) =>
+        String(
+          r.no_suficiencia ?? r.folio_num ?? r.numero_suficiencia ?? ""
+        ).trim()
+      )
       .filter(Boolean);
 
-    alert(`Encontrada(s): ${rows.length}${folios.length ? "\nFolios: " + folios.join(", ") : ""}`);
+    alert(
+      `Encontrada(s): ${rows.length}${
+        folios.length ? "\nFolios: " + folios.join(", ") : ""
+      }`
+    );
   }
 
   async function buscarPorNumero(numero) {
     const num = pad6(numero);
-    const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(num)}`;
+    const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(
+      num
+    )}`;
     const json = await fetchJson(url, { headers: { ...authHeaders() } });
     renderResultadosBusqueda(json?.data || []);
   }
@@ -200,12 +208,15 @@
 
   // ---------------------------
   // Folio (No. Suficiencia)
+  // ✅ NO se muestra hasta guardar (evita duplicados por concurrencia)
   // ---------------------------
-  async function loadNextFolio() {
-    const data = await fetchJson(`${API}/api/suficiencias/next-folio`, {
-      headers: { ...authHeaders() },
-    });
-    setVal("no_suficiencia", String(data.folio_num).padStart(6, "0"));
+  function initFolioUI() {
+    setVal("no_suficiencia", "");
+    const el = document.querySelector('[name="no_suficiencia"]');
+    if (el) {
+      el.readOnly = true;
+      el.placeholder = "Se asignará al guardar";
+    }
   }
 
   // ---------------------------
@@ -330,6 +341,17 @@
       (x) =>
         `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`
     );
+  }
+
+  // ✅ Cuando eligen fuente, guardamos id_fuente al hidden
+  function bindFuenteToHidden() {
+    const sel = document.querySelector('[name="fuente"]');
+    if (!sel) return;
+    sel.addEventListener("change", () => {
+      setVal("id_fuente", sel.value || "");
+    });
+    // inicial
+    setVal("id_fuente", sel.value || "");
   }
 
   // ---------------------------
@@ -692,112 +714,199 @@
     if (isrInput) isrInput.disabled = getImpuestoTipo() !== "ISR";
   }
 
+  // =====================================================================
+  // ✅ NUEVO: Construir payload COMPLETO desde el FORM (para comprometido)
+  // =====================================================================
+  function buildSufPayloadFromForm(saved) {
+    const getL = (name) =>
+      document.querySelector(`[name="${name}"]`)?.value ?? "";
+
+    const getNum = (name) => {
+      const x = Number(getL(name));
+      return Number.isFinite(x) ? x : 0;
+    };
+
+    // Detalle REAL (tu fila: No, clave, concepto, justificacion, descripcion, importe)
+    const detalle = Array.from(
+      document.querySelectorAll("#detalleBody tr")
+    ).map((tr) => {
+      const inputs = tr.querySelectorAll("input");
+
+      const clave = inputs[1]?.value ?? "";
+      const concepto_partida = inputs[2]?.value ?? "";
+      const justificacion = inputs[3]?.value ?? "";
+      const descripcion = inputs[4]?.value ?? "";
+      const importe = Number(inputs[5]?.value ?? 0);
+
+      return { clave, concepto_partida, justificacion, descripcion, importe };
+    });
+
+    const imp =
+      document.querySelector('input[name="impuesto_tipo"]:checked')?.value ||
+      "NONE";
+
+    return {
+      id: saved?.id ?? saved?.id_suficiencia ?? null,
+      folio_num:
+        saved?.folio_num ?? saved?.no_suficiencia ?? saved?.folio ?? null,
+
+      fecha: getL("fecha"),
+      dependencia: getL("dependencia"),
+      id_dgeneral: getL("id_dgeneral"),
+      dependencia_aux: getL("dependencia_aux"),
+      id_dauxiliar: getL("id_dauxiliar"),
+
+      id_proyecto: getL("id_proyecto"),
+      fuente: getL("fuente"),
+      id_fuente: getL("id_fuente"),
+      clave_programatica: getL("clave_programatica"),
+
+      mes_pago: getL("mes_pago"),
+      cantidad_pago: getNum("cantidad_pago"),
+
+      meta: getL("meta"),
+      subtotal: getNum("subtotal"),
+      iva: getNum("iva"),
+      isr: getNum("isr"),
+      total: getNum("total"),
+      cantidad_con_letra: getL("cantidad_con_letra"),
+
+      impuesto_tipo: imp,
+      isr_tasa: getL("isr_tasa"),
+
+      detalle,
+    };
+  }
+
+  function saveCpLastSuf(payload) {
+    localStorage.setItem(
+      "cp_last_suficiencia",
+      JSON.stringify({
+        id: payload.id,
+        payload,
+        loaded_from: "local",
+        loaded_at: new Date().toISOString(),
+      })
+    );
+  }
+
   // ---------------------------
   // Guardado (API)
   // ---------------------------
   function buildPayload() {
     const user = getLoggedUser();
-
     const id_usuario = user?.id != null ? Number(user.id) : null;
 
     const id_proyecto = get("id_proyecto") ? Number(get("id_proyecto")) : null;
 
-    
-    
-    // en tu HTML el select se llama name="fuente"
+    // en tu HTML el select se llama name="fuente" (value = id)
     const id_fuente = get("fuente") ? Number(get("fuente")) : null;
-    
+
     // texto visible del combo (ej "150101 - Recurso Estatal")
     const fuenteText =
-    document.querySelector('[name="fuente"]')?.selectedOptions?.[0]?.textContent?.trim() || "";
-    
+      document
+        .querySelector('[name="fuente"]')
+        ?.selectedOptions?.[0]?.textContent?.trim() || "";
+
     return {
       id_usuario,
       id_dgeneral: get("id_dgeneral") ? Number(get("id_dgeneral")) : null,
       id_dauxiliar: get("id_dauxiliar") ? Number(get("id_dauxiliar")) : null,
-      
+
       id_proyecto,
       id_fuente,
-      
-      // columnas que sí existen en tu tabla
-      no_suficiencia: get("no_suficiencia") || null,
+
+      no_suficiencia: null,
       fecha: get("fecha") || null,
       dependencia: get("dependencia") || null,
       mes_pago: get("mes_pago") || null,
 
       clave_programatica: get("clave_programatica") || null,
 
+      meta: get("meta") || null,
+      impuesto_tipo: getImpuestoTipo(),
+      isr_tasa: get("isr_tasa") || null,
+      subtotal: safeNumber(get("subtotal")),
+      iva: safeNumber(get("iva")),
+      isr: safeNumber(get("isr")),
+
       total: safeNumber(get("total")),
       cantidad_con_letra: get("cantidad_con_letra") || "",
-      
-      // si quieres guardar también el texto de fuente:
+
       fuente: fuenteText,
-      
-      // detalle con columnas reales (renglon)
-      detalle: buildDetalle(), // buildDetalle debe usar renglon
+
+      detalle: buildDetalle(),
     };
   }
 
   async function save() {
     refreshTotales();
-    const payload = buildPayload();
+
+    // ✅ payload para backend
+    const payloadBackend = buildPayload();
 
     // ✅ VALIDACIONES FRONT
-    if (!payload.id_usuario) {
+    if (!payloadBackend.id_usuario) {
       throw new Error(
         "No se detectó el usuario logueado (cp_usuario). Vuelve a iniciar sesión."
       );
     }
-    if (!payload.id_proyecto) {
+    if (!payloadBackend.id_proyecto) {
       throw new Error("Selecciona un PROYECTO antes de guardar.");
     }
-    if (!payload.id_fuente) {
+    if (!payloadBackend.id_fuente) {
       throw new Error("Selecciona una FUENTE antes de guardar.");
     }
 
-    const data = await fetchJson(`${API}/api/suficiencias`, {
+    // ✅ POST
+    const saved = await fetchJson(`${API}/api/suficiencias`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...authHeaders(),
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payloadBackend),
     });
 
-    if (!data?.id) {
-      console.error("[SP] Respuesta sin id:", data);
+    console.log("[SP] respuesta POST /api/suficiencias:", saved);
+
+    if (!saved?.id) {
+      console.error("[SP] Respuesta sin id:", saved);
       throw new Error("El servidor no devolvió el ID del registro.");
     }
 
-    lastSavedId = data.id;
+    lastSavedId = saved.id;
 
-    // Guarda último registro
-    try {
-      localStorage.setItem(
-        "cp_last_suficiencia",
-        JSON.stringify({
-          id: data.id,
-          folio_num: data.folio_num,
-          saved_at: new Date().toISOString(),
-          payload,
-        })
-      );
-    } catch {}
-
-    // Folio visual
-    if (data.folio_num != null) {
-      setVal("no_suficiencia", String(data.folio_num).padStart(6, "0"));
+    // ✅ Folio visual
+    if (saved?.no_suficiencia) {
+      setVal("no_suficiencia", String(saved.no_suficiencia).padStart(6, "0"));
+    } else if (saved?.folio_num != null) {
+      setVal("no_suficiencia", String(saved.folio_num).padStart(6, "0"));
     }
 
-    // Habilita comprometido
+    // ✅ AHORA SÍ: guardar en localStorage el payload COMPLETO (tal cual el form)
+    // (esto es lo que consumirá comprometido.js)
+    try {
+      const payloadCompleto = buildSufPayloadFromForm(saved);
+      saveCpLastSuf(payloadCompleto);
+    } catch (e) {
+      console.warn("[SP] No se pudo guardar cp_last_suficiencia completo:", e);
+    }
+
+    // ✅ Habilita comprometido
     if (btnVerComprometido) {
       btnVerComprometido.disabled = false;
       btnVerComprometido.dataset.id = String(lastSavedId);
       btnVerComprometido.classList.remove("disabled");
     }
+    if (btnVerDevengado) {
+      btnVerDevengado.disabled = false;
+      btnVerDevengado.dataset.id = String(lastSavedId);
+      btnVerDevengado.classList.remove("disabled");
+    }
 
     alert("Guardado correctamente.");
-    return data;
+    return saved;
   }
 
   // ---------------------------
@@ -816,6 +925,10 @@
   function goComprometido(id) {
     if (!id) return;
     window.location.href = `comprometido.html?id=${encodeURIComponent(id)}`;
+  }
+  function goDevengado(id) {
+    if (!id) return;
+    window.location.href = `devengado.html?id=${encodeURIComponent(id)}`;
   }
 
   // ---------------------------
@@ -986,6 +1099,7 @@
     btnRemoveRow?.addEventListener("click", removeRow);
 
     if (btnVerComprometido) btnVerComprometido.type = "button";
+    if (btnVerDevengado) btnVerDevengado.type = "button";
     if (btnGuardar) btnGuardar.type = "button";
     if (btnSi) btnSi.type = "button";
     if (btnDescargarPdf) btnDescargarPdf.type = "button";
@@ -1032,8 +1146,28 @@
         alert("Primero guarda la Suficiencia para generar el Comprometido.");
         return;
       }
+
+      // ✅ ya tienes el payload completo guardado por save()
       goComprometido(id);
     });
+
+    btnVerDevengado?.addEventListener("click", (e) => {
+  e.preventDefault();
+
+  let id = btnVerDevengado.dataset.id
+    ? Number(btnVerDevengado.dataset.id)
+    : null;
+
+  if (!id && lastSavedId) id = Number(lastSavedId);
+  if (!id) id = readLastIdFromLocalStorage();
+
+  if (!id) {
+    alert("Primero guarda la Suficiencia para generar el Devengado.");
+    return;
+  }
+
+  goDevengado(id);
+});
 
     document
       .querySelector('[name="id_proyecto"]')
@@ -1048,7 +1182,7 @@
     }
 
     // ---------------------------
-    // ✅ NUEVO: Eventos BUSCADOR
+    // ✅ Eventos BUSCADOR
     // ---------------------------
     btnToggleBuscar?.addEventListener("click", () => {
       if (!panelBuscar) return;
@@ -1063,7 +1197,8 @@
     btnBuscarNumero?.addEventListener("click", async () => {
       try {
         const n = txtNumeroSuf?.value || "";
-        if (!String(n).trim()) return alert("Escribe el número de suficiencia.");
+        if (!String(n).trim())
+          return alert("Escribe el número de suficiencia.");
         await buscarPorNumero(n);
       } catch (err) {
         console.error("[BUSCAR] error:", err);
@@ -1072,8 +1207,12 @@
     });
 
     btnBuscarClaves?.addEventListener("click", async () => {
-  alert("Búsqueda por Dep + Programática: pendiente (aún no está implementada en el backend). Usa búsqueda por número.");
-});
+      alert(
+        "Búsqueda por Dep + Programática: pendiente (aún no está implementada en el backend). Usa búsqueda por número."
+      );
+      // Cuando lo tengas en backend, cambias a:
+      // await buscarPorClaves(txtDepClave.value, txtProgClave.value);
+    });
 
     txtNumeroSuf?.addEventListener("keydown", (e) => {
       if (e.key === "Enter") btnBuscarNumero?.click();
@@ -1094,6 +1233,7 @@
 
     setFechaHoy();
     lockCantidadPago();
+    initFolioUI();
 
     initRows();
     bindEvents();
@@ -1102,11 +1242,6 @@
       await loadPartidasCatalog();
     } catch (e) {
       console.warn("[SP] catálogo partidas:", e.message);
-    }
-    try {
-      await loadNextFolio();
-    } catch (e) {
-      console.warn("[SP] folio:", e.message);
     }
 
     try {
@@ -1121,6 +1256,7 @@
     }
     try {
       await loadFuentesCatalog();
+      bindFuenteToHidden(); // ✅ importante para id_fuente
     } catch (e) {
       console.warn("[SP] fuentes:", e.message);
     }
@@ -1132,6 +1268,11 @@
         btnVerComprometido.dataset.id = String(lastId);
         btnVerComprometido.classList.remove("disabled");
       }
+      if (btnVerDevengado && lastId) {
+  btnVerDevengado.disabled = false;
+  btnVerDevengado.dataset.id = String(lastId);
+  btnVerDevengado.classList.remove("disabled");
+}
     } catch {}
 
     refreshTotales();

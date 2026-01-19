@@ -1,5 +1,5 @@
 import express from "express";
-import { query } from "../db.js";
+import { query, getClient } from "../db.js"; // 👈 necesitas getClient para transacción
 
 const router = express.Router();
 
@@ -21,13 +21,13 @@ function pad6(v) {
 }
 
 /* =====================================================
-   ✅ GET /api/suficiencias/next-folio
-   (Ejemplo simple, ajusta a tu lógica real si ya existe)
+   GET /api/suficiencias/next-folio
    ===================================================== */
 router.get("/next-folio", async (req, res) => {
   try {
-    // Si tu sistema usa folio_num como consecutivo numérico:
-    const r = await query(`SELECT COALESCE(MAX(folio_num),0) + 1 AS folio_num FROM suficiencias`);
+    const r = await query(
+      `SELECT COALESCE(MAX(folio_num),0) + 1 AS folio_num FROM suficiencias`
+    );
     return res.json({ folio_num: Number(r.rows?.[0]?.folio_num || 1) });
   } catch (err) {
     console.error("[next-folio] error:", err);
@@ -36,101 +36,248 @@ router.get("/next-folio", async (req, res) => {
 });
 
 /* =====================================================
-   ✅ POST /api/suficiencias
-   (Ejemplo: tu backend real quizá ya lo tenga)
+   ✅ POST /api/suficiencias  (CABECERA + DETALLE)
    ===================================================== */
 router.post("/", async (req, res) => {
+  const client = await getClient();
   try {
     const b = req.body || {};
 
-    // Inserta lo mínimo que tu tabla pide (ajusta a tu implementación real)
-    const r = await query(
-      `INSERT INTO suficiencias
-        (id_usuario, id_dgeneral, id_dauxiliar, id_proyecto, id_fuente, no_suficiencia, fecha, dependencia, departamento, fuente, mes_pago, total, cantidad_con_letra, created_at, folio_num)
-       VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, NOW(), $14)
-       RETURNING id, folio_num, no_suficiencia`,
-      [
-        b.id_usuario ?? null,
-        b.id_dgeneral ?? null,
-        b.id_dauxiliar ?? null,
-        b.id_proyecto ?? null,
-        b.id_fuente ?? null,
-        b.no_suficiencia ?? null,
-        b.fecha ?? null,
-        b.dependencia ?? null,
-        b.departamento ?? null,
-        b.fuente ?? null,
-        b.mes_pago ?? null,
-        b.total ?? 0,
-        b.cantidad_con_letra ?? "",
-        b.folio_num ?? null,
-      ]
-    );
+    await client.query("BEGIN");
 
-    return res.json({ id: r.rows[0].id, folio_num: r.rows[0].folio_num });
+    // ================================
+    // 1️⃣ INSERT CABECERA
+    // ================================
+    const sqlHead = `
+      WITH n AS (
+        SELECT nextval('suficiencias_folio_seq')::int AS folio_num
+      )
+      INSERT INTO suficiencias (
+        id_usuario,
+        id_dgeneral,
+        id_dauxiliar,
+        id_proyecto,
+        id_fuente,
+
+        no_suficiencia,
+        fecha,
+        dependencia,
+        departamento,
+        fuente,
+        mes_pago,
+        clave_programatica,
+
+        meta,
+        impuesto_tipo,
+        isr_tasa,
+        subtotal,
+        iva,
+        isr,
+
+        total,
+        cantidad_con_letra,
+        created_at,
+        folio_num
+      )
+      SELECT
+        $1, $2, $3, $4, $5,
+        LPAD(n.folio_num::text, 6, '0'),
+        $6, $7, $8, $9, $10, $11,
+        $12,
+        $13, $14, $15, $16, $17,
+        $18, $19,
+        NOW(),
+        n.folio_num
+      FROM n
+      RETURNING id, folio_num, no_suficiencia;
+    `;
+
+    const headParams = [
+      b.id_usuario,
+      b.id_dgeneral,
+      b.id_dauxiliar,
+      b.id_proyecto,
+      b.id_fuente,
+
+      b.fecha,
+      b.dependencia,
+      b.departamento,
+      b.fuente,
+      b.mes_pago,
+      b.clave_programatica,
+
+      b.meta,
+      b.impuesto_tipo,
+      b.isr_tasa,
+      b.subtotal,
+      b.iva,
+      b.isr,
+
+      b.total,
+      b.cantidad_con_letra,
+    ];
+
+    const rHead = await client.query(sqlHead, headParams);
+    const idSuf = rHead.rows[0].id;
+
+    // ================================
+    // 2️⃣ INSERT DETALLE
+    // ================================
+    if (Array.isArray(b.detalle) && b.detalle.length > 0) {
+      const values = [];
+      const params = [];
+      let idx = 1;
+
+      for (const d of b.detalle) {
+        values.push(
+          `($${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++}, $${idx++})`
+        );
+        params.push(
+          idSuf,
+          d.renglon,
+          d.clave,
+          d.concepto_partida,
+          d.justificacion,
+          d.descripcion,
+          d.importe
+        );
+      }
+
+      const sqlDet = `
+        INSERT INTO suficiencia_detalle
+        (id_suficiencia, renglon, clave, concepto_partida, justificacion, descripcion, importe)
+        VALUES ${values.join(",")}
+      `;
+
+      await client.query(sqlDet, params);
+    }
+
+    await client.query("COMMIT");
+
+    return res.json({
+      ok: true,
+      id: idSuf,
+      folio_num: rHead.rows[0].folio_num,
+      no_suficiencia: rHead.rows[0].no_suficiencia,
+    });
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error("[POST suficiencias] error:", err);
-    return res.status(500).json({ error: "Error al guardar suficiencia" });
+    return res.status(500).json({
+      error: "Error al guardar suficiencia",
+      db: err.message,
+    });
+  } finally {
+    client.release();
   }
 });
+
 
 /* =====================================================
-   ✅ NUEVO: GET /api/suficiencias/buscar
-   SOLO:
-   - ?numero=000001
-
-   Candado:
-   - GOD/ADMIN -> todo
-   - AREA -> solo su id_dgeneral
-     (porque tu tabla NO tiene 'area' ni 'dgeneral_clave')
+   GET /api/suficiencias/buscar
    ===================================================== */
-router.get("/buscar", async (req, res) => {
+router.post("/", async (req, res) => {
+  const client = await getClient();
+
   try {
-    const role = getRole(req);
+    const b = req.body;
 
-    // 🚨 AREA: candado por id_dgeneral (lo tienes en tu tabla)
-    const userIdDgeneral = req.user?.id_dgeneral ? Number(req.user.id_dgeneral) : null;
+    await client.query("BEGIN");
 
-    const numero = pad6(req.query.numero);
-    if (!numero) {
-      return res.status(400).json({ ok: false, msg: "Debes enviar numero." });
+    // 1️⃣ CABECERA
+    const headSql = `
+      WITH n AS (
+        SELECT nextval('suficiencias_folio_seq')::int AS folio_num
+      )
+      INSERT INTO suficiencias (
+        id_usuario,
+        id_dgeneral,
+        id_dauxiliar,
+        id_proyecto,
+        id_fuente,
+        no_suficiencia,
+        fecha,
+        dependencia,
+        fuente,
+        mes_pago,
+        clave_programatica,
+        meta,
+        impuesto_tipo,
+        isr_tasa,
+        subtotal,
+        iva,
+        isr,
+        total,
+        cantidad_con_letra,
+        created_at,
+        folio_num
+      )
+      SELECT
+        $1,$2,$3,$4,$5,
+        LPAD(n.folio_num::text,6,'0'),
+        $6,$7,$8,$9,$10,
+        $11,$12,$13,$14,$15,$16,$17,$18,
+        NOW(),
+        n.folio_num
+      FROM n
+      RETURNING id;
+    `;
+
+    const headParams = [
+      b.id_usuario,
+      b.id_dgeneral,
+      b.id_dauxiliar,
+      b.id_proyecto,
+      b.id_fuente,
+      b.fecha,
+      b.dependencia,
+      b.fuente,
+      b.mes_pago,
+      b.clave_programatica,
+      b.meta,
+      b.impuesto_tipo,
+      b.isr_tasa,
+      b.subtotal,
+      b.iva,
+      b.isr,
+      b.total,
+      b.cantidad_con_letra,
+    ];
+
+    const headRes = await client.query(headSql, headParams);
+    const idSuf = headRes.rows[0].id;
+
+    // 2️⃣ DETALLE (AQUÍ ESTABA TODO EL PEDO)
+    const detSql = `
+      INSERT INTO suficiencia_detalle
+      (id_suficiencia, renglon, clave, concepto_partida, justificacion, descripcion, importe)
+      VALUES ($1,$2,$3,$4,$5,$6,$7)
+    `;
+
+    for (const r of b.detalle || []) {
+      await client.query(detSql, [
+        idSuf,
+        r.renglon,
+        r.clave,
+        r.concepto_partida,
+        r.justificacion,
+        r.descripcion,
+        r.importe,
+      ]);
     }
 
-    // Buscar por no_suficiencia (tu columna existe)
-    const params = [];
-    let sql = `SELECT * FROM suficiencias WHERE no_suficiencia = $1`;
-    params.push(numero);
+    await client.query("COMMIT");
 
-    // Candado AREA
-    if (role === "AREA") {
-      if (!userIdDgeneral) {
-        return res.status(403).json({ ok: false, msg: "Usuario AREA sin id_dgeneral en token." });
-      }
-      sql += ` AND id_dgeneral = $2`;
-      params.push(userIdDgeneral);
-    }
+    res.json({ ok: true, id: idSuf });
 
-    sql += ` ORDER BY id DESC LIMIT 50`;
-
-    const r = await query(sql, params);
-    return res.json({ ok: true, data: r.rows });
   } catch (err) {
-    console.error("[/buscar] error:", err);
-    return res.status(500).json({ ok: false, msg: "Error interno", error: err.message });
+    await client.query("ROLLBACK");
+    console.error("[POST suficiencias]", err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
   }
-
-  if (role === "AREA") {
-  if (!userIdDgeneral) {
-    return res.status(403).json({
-      ok: false,
-      msg: "Usuario AREA sin id_dgeneral (authRequired no lo está cargando en req.user).",
-    });
-  }
-  sql += ` AND id_dgeneral = $2`;
-  params.push(userIdDgeneral);
-}
-
 });
+
 
 export default router;

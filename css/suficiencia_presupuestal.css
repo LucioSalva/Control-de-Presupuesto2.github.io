@@ -7,7 +7,7 @@ body {
 }
 
 /* =========================
-   NAVBAR PRINCIPAL (vino)
+   NAVBAR PRINCIPAL
    ========================= */
 .navbar {
   background: #BC955C;
@@ -20,7 +20,6 @@ body {
   width: 100%;
 }
 
-/* NAVBAR de pestañas (claro bajo el navbar vino) */
 .navbar-light {
   position: fixed;
   top: 50px;
@@ -181,24 +180,15 @@ body {
   text-align: center;
 }
 
-/* Firma */
-.firma {
-  text-align: center;
-  padding-top: 50px;
-  font-size: 11px;
-}
-
-.firma-linea {
-  border-top: 1px solid #000;
-  margin: 0 auto 3px auto;
-  width: 80%;
+/* ✅ Centrado vertical para todas las tablas */
+.table td,
+.table th {
+  vertical-align: middle !important;
 }
 
 /* =========================
-   INPUTS "COMO TEXTO" (NO FORMULARIO)
+   INPUTS "COMO TEXTO"
    ========================= */
-
-/* Reglas base: que NO parezca input editable */
 .form-container .as-text,
 .form-container .as-text:read-only,
 .form-container .ro,
@@ -212,36 +202,29 @@ body {
   cursor: default !important;
 }
 
-/* Evita el borde azul al enfocar */
 .form-container .as-text:focus,
 .form-container .ro:focus {
   outline: none !important;
   box-shadow: none !important;
 }
 
-/* Texto institucional (más grueso, más limpio) */
+/* Texto institucional */
 .td-text {
   font-weight: 800 !important;
   letter-spacing: 0.25px;
   line-height: 1.15 !important;
 }
 
-/* Campo en TD: centrado vertical + horizontal REAL */
-td .as-text,
-td .ro {
-  display: flex !important;
-  align-items: center !important; /* centro vertical */
-  justify-content: center !important; /* centro horizontal */
-  width: 100%;
-  height: 100%;
+.form-container input.as-text,
+.form-container input.ro {
   padding: 0 !important;
   margin: 0 !important;
 }
 
-/* Si es text-end, respeta derecha (TOTAL, SUBTOTAL, etc.) */
-td .text-end.as-text,
-td .text-end.ro {
-  justify-content: flex-end !important;
+/* Centrado horizontal para texto */
+.form-container input.as-text:not(.text-end),
+.form-container input.ro:not(.text-end) {
+  text-align: center;
 }
 
 /* Para folio */
@@ -267,12 +250,13 @@ input[type="date"].as-text::-webkit-inner-spin-button {
 }
 
 /* =========================
-   (OPCIONAL) CAMPOS EDITABLES: más "oficial"
+   CAMPOS EDITABLES
    ========================= */
 .form-container input.form-control:not(.as-text):not(.ro),
 .form-container select.form-select:not(.as-text) {
   border: 1px solid #b9b9b9;
 }
+
 .form-container input.form-control:not(.as-text):focus,
 .form-container select.form-select:not(.as-text):focus {
   box-shadow: none;
@@ -280,16 +264,38 @@ input[type="date"].as-text::-webkit-inner-spin-button {
 }
 
 /* =========================
+   ✅ TABLA FORMATO (la que se rompía)
+   ========================= */
+.table.formato {
+  table-layout: fixed; /* estable */
+  width: 100%;
+}
+
+.table.formato th,
+.table.formato td {
+  padding: 6px 8px;
+}
+
+/* ✅ IMPORTANTÍSIMO: evita letra-por-letra */
+.table.formato th {
+  white-space: normal;
+  word-break: keep-all;     /* NO rompe palabras en letras */
+  overflow-wrap: normal;    /* NO uses 'anywhere' */
+  hyphens: none;
+}
+
+/* ✅ selects e inputs full */
+.table.formato select,
+.table.formato input {
+  width: 100%;
+}
+
+/* =========================
    IMPRESIÓN
    ========================= */
 @media print {
-  body {
-    background-color: #ffffff;
-  }
-
-  .no-print {
-    display: none !important;
-  }
+  body { background-color: #ffffff; }
+  .no-print { display: none !important; }
 
   .form-container {
     box-shadow: none;
@@ -305,9 +311,7 @@ input[type="date"].as-text::-webkit-inner-spin-button {
    RESPONSIVE NAVBAR
    ========================= */
 @media (max-width: 992px) {
-  body {
-    padding-top: 140px;
-  }
+  body { padding-top: 140px; }
 
   .logo-container {
     position: static;
@@ -323,22 +327,81 @@ input[type="date"].as-text::-webkit-inner-spin-button {
     min-height: auto;
   }
 
-  .navbar-brand {
-    order: 1;
-  }
+  .navbar-brand { order: 1; }
+  .nav-search { order: 2; margin: 5px 0; }
+  .ms-auto { order: 4; margin-left: 0 !important; margin-top: 5px; }
 
-  .nav-search {
-    order: 2;
-    margin: 5px 0;
-  }
+  .navbar-light { top: 100px; }
+}
+/* =========================
+   ✅ FORMATO: que respire
+   ========================= */
+.table.formato th,
+.table.formato td {
+  padding: 12px 12px !important;   /* más aire */
+  line-height: 1.25 !important;    /* texto más legible */
+}
 
-  .ms-auto {
-    order: 4;
-    margin-left: 0 !important;
-    margin-top: 5px;
-  }
+/* Altura mínima por fila (evita que se vea comprimido) */
+.table.formato tr {
+  height: 62px;
+}
 
-  .navbar-light {
-    top: 100px;
-  }
+/* Los headers largos se leen mejor */
+.table.formato th.table-header {
+  font-size: 12px;
+  letter-spacing: 0.2px;
+}
+
+/* Inputs/selects con altura uniforme */
+.table.formato .form-control,
+.table.formato .form-select {
+  min-height: 36px;
+}
+
+/* En el td grande, evita que el select se vea pegado al borde */
+.table.formato td {
+  padding-left: 14px !important;
+  padding-right: 14px !important;
+}
+
+
+/* =========================
+   FIX: NO usar flex dentro de TDs del formato
+   ========================= */
+.table.formato td .as-text,
+.table.formato td .ro {
+  display: block !important;
+  width: 100% !important;
+  height: auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+
+  /* por si heredó flex */
+  align-items: initial !important;
+  justify-content: initial !important;
+}
+
+/* Alineación “normal” en tabla */
+.table.formato th,
+.table.formato td {
+  vertical-align: middle !important;
+  padding: 12px 12px !important;
+}
+
+/* Columnas fijas (solo esto) */
+.table.formato {
+  table-layout: fixed;
+  width: 100%;
+}
+.table.formato col.c-lbl:nth-child(1){ width: 24%; }
+.table.formato col.c-val:nth-child(2){ width: 26%; }
+.table.formato col.c-lbl:nth-child(3){ width: 24%; }
+.table.formato col.c-val:nth-child(4){ width: 26%; }
+
+/* Select e inputs en ancho completo sin romper */
+.table.formato select,
+.table.formato input {
+  width: 100%;
+  min-width: 0;
 }

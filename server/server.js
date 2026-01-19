@@ -18,6 +18,7 @@ import authRouter from "./routes/auth.routes.js";
 import suficienciasRouter from "./routes/suficiencias.routes.js";
 import presupuestoRouter from "./routes/presupuesto.routes.js";
 import comprometidoRouter from "./routes/comprometido.routes.js";
+import devengadoRouter from "./routes/devengado.routes.js";
 
 dotenv.config();
 
@@ -74,21 +75,20 @@ async function authRequired(req, res, next) {
     const { userId } = parsed;
 
     const sql = `
-  SELECT u.id,
-         u.activo,
-         u.id_dgeneral,
-         u.id_dauxiliar,
-         ARRAY(
-           SELECT r.clave
-           FROM usuario_rol ur
-           JOIN roles r ON r.id = ur.id_rol
-           WHERE ur.id_usuario = u.id
-         ) AS roles
-  FROM usuarios u
-  WHERE u.id = $1
-  LIMIT 1;
-`;
-
+      SELECT u.id,
+             u.activo,
+             u.id_dgeneral,
+             u.id_dauxiliar,
+             ARRAY(
+               SELECT r.clave
+               FROM usuario_rol ur
+               JOIN roles r ON r.id = ur.id_rol
+               WHERE ur.id_usuario = u.id
+             ) AS roles
+      FROM usuarios u
+      WHERE u.id = $1
+      LIMIT 1;
+    `;
 
     const r = await query(sql, [userId]);
 
@@ -99,12 +99,14 @@ async function authRequired(req, res, next) {
     if (!user.activo)
       return res.status(403).json({ error: "Usuario inactivo" });
 
+    const roles = Array.isArray(user.roles) ? user.roles : [];
+
     req.user = {
-  id: user.id,
-  id_dgeneral: user.id_dgeneral,
-  id_dauxiliar: user.id_dauxiliar,
-  roles: roles.map((x) => String(x).trim().toUpperCase()),
-};
+      id: user.id,
+      id_dgeneral: user.id_dgeneral,
+      id_dauxiliar: user.id_dauxiliar,
+      roles: roles.map((x) => String(x).trim().toUpperCase()),
+    };
 
     next();
   } catch (e) {
@@ -150,16 +152,19 @@ app.use("/api/admin/usuarios", adminUsuariosRouter);
 app.use("/api/suficiencias", authRequired, suficienciasRouter);
 
 // Comprometido (solo lectura)
-app.use("/api/comprometido", comprometidoRouter);
+app.use("/api/comprometido", authRequired, comprometidoRouter);
+// Devengado (solo lectura)
+app.use("/api/devengado", authRequired, devengadoRouter);
+
 
 // Presupuesto / detalles / projects / etc.
 app.use("/api", presupuestoRouter);
 
-// ✅ Catálogos (si quieres que solo logueados los vean)
-app.use("/api/catalogos", authRequired, catalogosRoutes);
-
 // ✅ Blindaje específico: PARTIDAS (prohíbe escritura a AREA)
 app.use("/api/catalogos/partidas", authRequired, blockPartidasWrite);
+
+// ✅ Catálogos (si quieres que solo logueados los vean)
+app.use("/api/catalogos", authRequired, catalogosRoutes);
 
 // =====================================================
 //  HEALTH
