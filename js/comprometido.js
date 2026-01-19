@@ -257,12 +257,14 @@
     subtotal: safeNumber(payload.subtotal),
     iva: safeNumber(payload.iva),
     isr: safeNumber(payload.isr),
+    ieps: safeNumber(payload.ieps),
     total: safeNumber(payload.total),
     cantidad_pago: safeNumber(payload.cantidad_pago ?? payload.total),
 
     cantidad_con_letra: payload.cantidad_con_letra ?? "",
     impuesto_tipo: payload.impuesto_tipo ?? "NONE",
     isr_tasa: payload.isr_tasa ?? "",
+    ieps_tasa: payload.ieps_tasa ?? "",
 
     detalle: Array.isArray(payload.detalle) ? payload.detalle : [],
   };
@@ -361,12 +363,14 @@ console.log("[COMPROMETIDO] detalle length:", payload.detalle?.length);
   setVal("subtotal", safeNumber(payload.subtotal).toFixed(2));
   setVal("iva", safeNumber(payload.iva).toFixed(2));
   setVal("isr", safeNumber(payload.isr).toFixed(2));
+  setVal("ieps", safeNumber(payload.ieps).toFixed(2));
   setVal("total", safeNumber(payload.total).toFixed(2));
   setVal("cantidad_con_letra", payload.cantidad_con_letra || "");
 
   // Impuestos
   setImpuestoTipo(payload.impuesto_tipo);
   setVal("isr_tasa", payload.isr_tasa ?? "");
+  setVal("ieps_tasa", payload.ieps_tasa ?? "");
 
   // Detalle
   renderDetalle(payload.detalle);

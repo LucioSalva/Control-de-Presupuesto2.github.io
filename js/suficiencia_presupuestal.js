@@ -522,8 +522,21 @@
     return val;
   }
 
+  function getIepsPercent() {
+    const el = document.querySelector('[name="ieps_tasa"]');
+    let val = el ? Number(el.value) : 0;
+    if (!Number.isFinite(val)) val = 0;
+    if (val < 0) val = 0;
+    if (val > 100) val = 100;
+    return val;
+  }
+
   function getIsrRate() {
     return getIsrPercent() / 100;
+  }
+
+  function getIepsRate() {
+    return getIepsPercent() / 100;
   }
 
   function refreshTotales() {
@@ -533,15 +546,18 @@
     const tipo = getImpuestoTipo();
     let iva = 0;
     let isr = 0;
+    let ieps = 0;
 
     if (tipo === "IVA") iva = subtotal * 0.16;
     else if (tipo === "ISR") isr = subtotal * getIsrRate();
+    else if (tipo === "IEPS") ieps = subtotal * getIepsRate();
 
-    const total = subtotal + iva + isr;
+    const total = subtotal + iva + isr + ieps;
 
     setVal("subtotal", subtotal.toFixed(2));
     setVal("iva", iva.toFixed(2));
     setVal("isr", isr.toFixed(2));
+    setVal("ieps", ieps.toFixed(2));
     setVal("total", total.toFixed(2));
     setVal("cantidad_pago", total.toFixed(2));
     setVal("cantidad_con_letra", numeroALetrasMX(total));
@@ -698,6 +714,7 @@
   function bindTaxEvents() {
     const radios = document.querySelectorAll('input[name="impuesto_tipo"]');
     const isrInput = document.querySelector('[name="isr_tasa"]');
+    const iepsInput = document.querySelector('[name="ieps_tasa"]');
 
     radios.forEach((r) => {
       r.addEventListener("change", () => {
@@ -706,12 +723,18 @@
           isrInput.disabled = tipo !== "ISR";
           if (tipo === "ISR" && !isrInput.value) isrInput.value = "10";
         }
+         if (iepsInput) {
+          iepsInput.disabled = tipo !== "IEPS";
+          if (tipo === "IEPS" && !iepsInput.value) iepsInput.value = "8";
+        }
         refreshTotales();
       });
     });
 
     isrInput?.addEventListener("input", refreshTotales);
+    iepsInput?.addEventListener("input", refreshTotales);
     if (isrInput) isrInput.disabled = getImpuestoTipo() !== "ISR";
+    if (iepsInput) iepsInput.disabled = getImpuestoTipo() !== "IEPS";
   }
 
   // =====================================================================
@@ -768,11 +791,13 @@
       subtotal: getNum("subtotal"),
       iva: getNum("iva"),
       isr: getNum("isr"),
+      ieps: getNum("ieps"),
       total: getNum("total"),
       cantidad_con_letra: getL("cantidad_con_letra"),
 
       impuesto_tipo: imp,
       isr_tasa: getL("isr_tasa"),
+      ieps_tasa: getL("ieps_tasa"),
 
       detalle,
     };
@@ -826,9 +851,11 @@
       meta: get("meta") || null,
       impuesto_tipo: getImpuestoTipo(),
       isr_tasa: get("isr_tasa") || null,
+      ieps_tasa: get("ieps_tasa") || null,
       subtotal: safeNumber(get("subtotal")),
       iva: safeNumber(get("iva")),
       isr: safeNumber(get("isr")),
+      ieps: safeNumber(get("ieps")),
 
       total: safeNumber(get("total")),
       cantidad_con_letra: get("cantidad_con_letra") || "",
@@ -970,6 +997,7 @@
       subtotal: get("subtotal"),
       iva: get("iva"),
       isr: get("isr"),
+      eps: get("ieps"),
       total: get("total"),
       cantidad_con_letra: get("cantidad_con_letra"),
       meta: get("meta"),
@@ -1071,6 +1099,7 @@
     setTextSafe("subtotal", safeN(payload.subtotal).toFixed(2));
     setTextSafe("IVA", safeN(payload.iva).toFixed(2));
     setTextSafe("ISR", safeN(payload.isr).toFixed(2));
+    setTextSafe("IEPS", safeN(payload.ieps).toFixed(2));
     setTextSafe("total", safeN(payload.total).toFixed(2));
     setTextSafe("CANTIDAD CON LETRA:", payload.cantidad_con_letra || "");
     setTextSafe("Meta", payload.meta || "");

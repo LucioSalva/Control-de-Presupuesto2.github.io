@@ -193,11 +193,11 @@
     <!-- META + TOTALES (MISMO) -->
     <table class="table table-bordered mb-2">
       <tr>
-        <th class="table-header align-middle text-center" style="width:15%; background-color: rgb(180, 180, 180);" rowspan="4">
+        <th class="table-header align-middle text-center" style="width:15%; background-color: rgb(180, 180, 180);" rowspan="5">
           META:
         </th>
 
-        <td class="align-middle" style="width:65%;" rowspan="4">
+        <td class="align-middle" style="width:65%;" rowspan="5">
           <div class="d-flex align-items-center h-100">
             <input type="text" class="form-control form-control-sm as-text td-text input-no-click" name="meta" readonly>
           </div>
@@ -224,6 +224,13 @@
       </tr>
 
       <tr>
+        <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">IEPS:</th>
+        <td>
+          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="ieps" readonly>
+        </td>
+      </tr>
+
+      <tr>
         <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">TOTAL:</th>
         <td>
           <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="total" readonly>
@@ -232,7 +239,7 @@
     </table>
 
     <!-- Impuestos (mismos radios, solo lectura) -->
-    <div class="d-flex align-items-center justify-content-end gap-3 mb-3">
+    <div class="d-flex flex-wrap align-items-center justify-content-end gap-3 mb-3">
       <div class="form-check m-0">
         <input class="form-check-input" type="radio" name="impuesto_tipo" value="NONE" disabled>
         <label class="form-check-label">Sin impuesto</label>
@@ -241,13 +248,25 @@
         <input class="form-check-input" type="radio" name="impuesto_tipo" value="IVA" disabled>
         <label class="form-check-label">IVA 16%</label>
       </div>
-      <div class="form-check m-0">
-        <input class="form-check-input" type="radio" name="impuesto_tipo" value="ISR" disabled>
-        <label class="form-check-label">ISR</label>
+      <div class="d-flex align-items-center gap-2 flex-nowrap">
+        <div class="form-check m-0">
+          <input class="form-check-input" type="radio" name="impuesto_tipo" value="ISR" disabled>
+          <label class="form-check-label">ISR</label>
+        </div>
+        <input type="number" class="form-control form-control-sm text-end" name="isr_tasa"
+          style="width:120px; flex: 0 0 120px;"
+          placeholder="Ej. 10 %" min="0" step="0.01" disabled />
       </div>
 
-      <input type="number" class="form-control form-control-sm text-end" name="isr_tasa" style="width:120px;"
-        placeholder="Ej. 10 %" min="0" step="0.01" disabled />
+      <div class="d-flex align-items-center gap-2 flex-nowrap">
+        <div class="form-check m-0">
+          <input class="form-check-input" type="radio" name="impuesto_tipo" value="IEPS" disabled>
+          <label class="form-check-label">IEPS</label>
+        </div>
+        <input type="number" class="form-control form-control-sm text-end" name="ieps_tasa"
+          style="width:120px; flex: 0 0 120px;"
+          placeholder="Ej. 8 %" min="0" step="0.01" disabled />
+      </div>
     </div>
 
     <table class="table table-bordered mb-4">

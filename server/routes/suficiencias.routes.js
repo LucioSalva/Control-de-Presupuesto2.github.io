@@ -70,9 +70,11 @@ router.post("/", async (req, res) => {
         meta,
         impuesto_tipo,
         isr_tasa,
+        ieps_tasa,
         subtotal,
         iva,
         isr,
+        ieps,
 
         total,
         cantidad_con_letra,
@@ -84,8 +86,8 @@ router.post("/", async (req, res) => {
         LPAD(n.folio_num::text, 6, '0'),
         $6, $7, $8, $9, $10, $11,
         $12,
-        $13, $14, $15, $16, $17,
-        $18, $19,
+        $13, $14, $15, $16, $17, $18, 
+        $19, $20, $21,
         NOW(),
         n.folio_num
       FROM n
@@ -109,9 +111,11 @@ router.post("/", async (req, res) => {
       b.meta,
       b.impuesto_tipo,
       b.isr_tasa,
+      b.ieps_tasa,
       b.subtotal,
       b.iva,
       b.isr,
+      b.ieps,
 
       b.total,
       b.cantidad_con_letra,
@@ -204,9 +208,11 @@ router.post("/", async (req, res) => {
         meta,
         impuesto_tipo,
         isr_tasa,
+        ieps_tasa,
         subtotal,
         iva,
         isr,
+        ieps,
         total,
         cantidad_con_letra,
         created_at,
@@ -216,7 +222,7 @@ router.post("/", async (req, res) => {
         $1,$2,$3,$4,$5,
         LPAD(n.folio_num::text,6,'0'),
         $6,$7,$8,$9,$10,
-        $11,$12,$13,$14,$15,$16,$17,$18,
+        $11,$12,$13,$14,$15,$16,$17,$18,$19,$20,
         NOW(),
         n.folio_num
       FROM n
@@ -237,9 +243,11 @@ router.post("/", async (req, res) => {
       b.meta,
       b.impuesto_tipo,
       b.isr_tasa,
+      b.ieps_tasa,
       b.subtotal,
       b.iva,
       b.isr,
+      b.ieps,
       b.total,
       b.cantidad_con_letra,
     ];
