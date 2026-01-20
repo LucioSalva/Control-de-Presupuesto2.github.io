@@ -51,7 +51,9 @@ const PROJECT_KEYS_KEY = "cp_current_project_keys";
 const API = window.API_URL;
 
 function normalizeKey(value) {
-  return String(value || "").trim().toLowerCase();
+  return String(value || "")
+    .trim()
+    .toLowerCase();
 }
 
 const STATE = {
@@ -86,7 +88,9 @@ function loadCurrentUserFromLS() {
       .filter((r) => r != null)
       .map((r) => String(r).trim().toUpperCase());
 
-    CURRENT_DG_CLAVE = String(user.dgeneral_clave || "").trim().toUpperCase();
+    CURRENT_DG_CLAVE = String(user.dgeneral_clave || "")
+      .trim()
+      .toUpperCase();
 
     console.log("[USER] ", CURRENT_USER);
     console.log("[USER] roles:", CURRENT_ROLES_NORM);
@@ -114,7 +118,7 @@ function escapeHtml(s) {
         ">": "&gt;",
         '"': "&quot;",
         "'": "&#39;",
-      }[c])
+      })[c]
   );
 }
 
@@ -221,6 +225,65 @@ const PROJECT_CATALOGS = {
 };
 let projectCatalogsLoaded = false;
 
+const DG_DAUXILIAR_FILTERS = {
+  A00: new Set(["100", "101", "122", "155", "172", "169", "137"]),
+  A01: new Set(["103"]),
+  A02: new Set(["102"]),
+  B01: new Set(["110"]),
+  B02: new Set(["110"]),
+  C01: new Set(["110"]),
+  C02: new Set(["110"]),
+  C03: new Set(["110"]),
+  C04: new Set(["110"]),
+  C05: new Set(["110"]),
+  C06: new Set(["110"]),
+  C07: new Set(["110"]),
+  C08: new Set(["110"]),
+  C09: new Set(["110"]),
+  C10: new Set(["110"]),
+  C11: new Set(["110"]),
+  C12: new Set(["110"]),
+  D00: new Set(["155", "114", "108", "109"]),
+  E00: new Set(["120", "121", "114"]),
+  F00: new Set(["123"]),
+  F01: new Set(["154"]),
+  G00: new Set(["160"]),
+  H00: new Set(["125", "126", "127", "128", "145", "147"]),
+  I00: new Set(["143"]),
+  I01: new Set(["112"]),
+  I02: new Set(["129", "153"]),
+  J00: new Set(["102", "111", "112", "144", "151"]),
+  K00: new Set(["134", "135", "136", "138", "139"]),
+  L00: new Set(["115", "116", "117", "118", "119", "137", "155"]),
+  M00: new Set(["155", "112"]),
+  N00: new Set(["131", "133", "137", "140", "149"]),
+  O00: new Set(["141", "150"]),
+  Q00: new Set(["104", "158"]),
+  T00: new Set(["105", "106"]),
+  V00: new Set(["152"]),
+  X00: new Set(["124"]),
+};
+
+const DAUXILIAR_PROYECTO_FILTERS = {
+  "116": new Set([
+    "0105020511",
+    "0401010104",
+    "0401010105",
+    "0402010104",
+    "0404010101",
+  ]),
+};
+
+function normalizeClave(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function getSelectedCatalogRow(idSel, arr) {
+  const sel = document.getElementById(idSel);
+  if (!sel || !sel.value) return null;
+  return arr.find((r) => String(r.id) === String(sel.value)) || null;
+}
+
 // Rellena un <select> con filas de catálogo
 function fillCatalogSelect(selectId, rows, labelFn) {
   const sel = document.getElementById(selectId);
@@ -282,6 +345,9 @@ async function loadProjectCatalogs() {
       selDg.disabled = false;
     }
 
+    applyDauxiliarFilters();
+    applyProyectoFilters();
+
     projectCatalogsLoaded = true;
   } catch (err) {
     banner(
@@ -294,17 +360,11 @@ async function loadProjectCatalogs() {
 
 // Actualiza el resumen del proyecto en la tarjeta de creación
 function updateProjectSummaryBox() {
-  const getSelRow = (idSel, arr) => {
-    const sel = document.getElementById(idSel);
-    if (!sel || !sel.value) return null;
-    return arr.find((r) => String(r.id) === String(sel.value)) || null;
-  };
-
   const resumen = [];
-  const dg = getSelRow("c-dgeneral", PROJECT_CATALOGS.dgeneral);
-  const da = getSelRow("c-dauxiliar", PROJECT_CATALOGS.dauxiliar);
-  const fu = getSelRow("c-fuente", PROJECT_CATALOGS.fuentes);
-  const prj = getSelRow("c-proyecto", PROJECT_CATALOGS.proyectos);
+  const dg = getSelectedCatalogRow("c-dgeneral", PROJECT_CATALOGS.dgeneral);
+  const da = getSelectedCatalogRow("c-dauxiliar", PROJECT_CATALOGS.dauxiliar);
+  const fu = getSelectedCatalogRow("c-fuente", PROJECT_CATALOGS.fuentes);
+  const prj = getSelectedCatalogRow("c-proyecto", PROJECT_CATALOGS.proyectos);
 
   if (dg)
     resumen.push(
@@ -341,6 +401,52 @@ function updateProjectSummaryBox() {
   const idInput = document.getElementById("c-idproyecto");
   if (idInput) {
     idInput.value = idProyectoAuto; // el usuario ya NO escribe nada
+  }
+}
+
+function applyDauxiliarFilters() {
+  const selectedDgeneral = getSelectedCatalogRow(
+    "c-dgeneral",
+    PROJECT_CATALOGS.dgeneral
+  );
+  const dgClave = normalizeClave(selectedDgeneral?.clave);
+  const allowed = DG_DAUXILIAR_FILTERS[dgClave];
+  const current = document.getElementById("c-dauxiliar")?.value || "";
+  const dauxiliarRows = allowed
+    ? PROJECT_CATALOGS.dauxiliar.filter((row) =>
+        allowed.has(normalizeClave(row.clave))
+      )
+    : PROJECT_CATALOGS.dauxiliar;
+
+  fillCatalogSelect("c-dauxiliar", dauxiliarRows, (r) => {
+    return `${r.clave} — ${r.dependencia}`;
+  });
+
+  if (current && dauxiliarRows.some((row) => String(row.id) === current)) {
+    document.getElementById("c-dauxiliar").value = current;
+  }
+}
+
+function applyProyectoFilters() {
+  const selectedDauxiliar = getSelectedCatalogRow(
+    "c-dauxiliar",
+    PROJECT_CATALOGS.dauxiliar
+  );
+  const daClave = normalizeClave(selectedDauxiliar?.clave);
+  const allowed = DAUXILIAR_PROYECTO_FILTERS[daClave];
+  const current = document.getElementById("c-proyecto")?.value || "";
+  const proyectoRows = allowed
+    ? PROJECT_CATALOGS.proyectos.filter((row) =>
+        allowed.has(normalizeClave(row.clave))
+      )
+    : PROJECT_CATALOGS.proyectos;
+
+  fillCatalogSelect("c-proyecto", proyectoRows, (r) => {
+    return `${r.clave} — ${r.descripcion}`;
+  });
+
+  if (current && proyectoRows.some((row) => String(row.id) === current)) {
+    document.getElementById("c-proyecto").value = current;
   }
 }
 
@@ -597,9 +703,9 @@ function renderMissing(rows) {
   tbody.innerHTML = "";
   rows.forEach((r) => {
     const d = r.fecha
-      ? `${String(r.fecha.getUTCDate()).padStart(2, "0")}/${MES[
-          r.fecha.getUTCMonth()
-        ]}/${r.fecha.getUTCFullYear()}`
+      ? `${String(r.fecha.getUTCDate()).padStart(2, "0")}/${
+          MES[r.fecha.getUTCMonth()]
+        }/${r.fecha.getUTCFullYear()}`
       : "—";
     const tr = document.createElement("tr");
     tr.dataset.partida = r.partida;
@@ -624,8 +730,8 @@ function showPartidaDetails(partidaTerm) {
       <div>Presupuesto: <strong>${money(row.presupuesto)}</strong></div>
       <div>Gastado: <strong>${money(gastado)}</strong></div>
       <div>Saldo: <strong class="${saldo < 0 ? "text-danger" : ""}">${money(
-    saldo
-  )}</strong></div>
+        saldo
+      )}</strong></div>
       <div>Reconducción: <strong>${money(row.recon)}</strong></div>
     </div>
   `;
@@ -649,8 +755,8 @@ function buildMovimientos() {
         r.fecha instanceof Date
           ? r.fecha.getTime()
           : r.fecha
-          ? new Date(r.fecha).getTime()
-          : Date.now(),
+            ? new Date(r.fecha).getTime()
+            : Date.now(),
       _incompleta: !!r._incompleta,
     });
   });
@@ -660,8 +766,8 @@ function buildMovimientos() {
       g.fecha instanceof Date
         ? g.fecha.getTime()
         : g.fecha
-        ? new Date(g.fecha).getTime()
-        : 0;
+          ? new Date(g.fecha).getTime()
+          : 0;
     movs.push({
       tipo: "Gasto",
       concepto: g.descripcion || "—",
@@ -693,9 +799,9 @@ function renderMovimientos() {
     const tipo = m._incompleta ? "Reconducción (incompleta)" : m.tipo;
 
     const fechaStr = m.fecha
-      ? `${String(m.fecha.getUTCDate()).padStart(2, "0")}/${MES[
-          m.fecha.getUTCMonth()
-        ]}/${m.fecha.getUTCFullYear()}`
+      ? `${String(m.fecha.getUTCDate()).padStart(2, "0")}/${
+          MES[m.fecha.getUTCMonth()]
+        }/${m.fecha.getUTCFullYear()}`
       : "—";
 
     tr.innerHTML = `
@@ -870,8 +976,8 @@ function renderAll() {
       <td class="text-end">${money(p.presupuesto)}</td>
       <td class="text-end">${money(gastado)}</td>
       <td class="text-end ${saldo < 0 ? "text-danger fw-bold" : ""}">${money(
-      saldo
-    )}</td>
+        saldo
+      )}</td>
     `;
     tbody.appendChild(tr);
   });
@@ -895,8 +1001,8 @@ function renderAll() {
     <td class="text-end fw-bold">${money(sumPres)}</td>
     <td class="text-end fw-bold">${money(sumGast)}</td>
     <td class="text-end fw-bold ${sumSaldo < 0 ? "text-danger" : ""}">${money(
-    sumSaldo
-  )}</td>`;
+      sumSaldo
+    )}</td>`;
   tbody.appendChild(trTot);
 
   const presupuestoTotal = STATE.presupuesto.reduce(
@@ -1416,6 +1522,9 @@ document.getElementById("btn-mode-new")?.addEventListener("click", async () => {
       selDg.disabled = true;
     }
 
+    applyDauxiliarFilters();
+    applyProyectoFilters();
+
     banner(
       `Solo puedes crear proyectos para tu dependencia general <strong>${escapeHtml(
         CURRENT_DG_CLAVE || ""
@@ -1439,7 +1548,18 @@ document.getElementById("btn-mode-search")?.addEventListener("click", () => {
 });
 
 // Actualizar resumen al cambiar combos
-["c-dgeneral", "c-dauxiliar", "c-fuente", "c-proyecto"].forEach((id) => {
+document.getElementById("c-dgeneral")?.addEventListener("change", () => {
+  applyDauxiliarFilters();
+  applyProyectoFilters();
+  updateProjectSummaryBox();
+});
+
+document.getElementById("c-dauxiliar")?.addEventListener("change", () => {
+  applyProyectoFilters();
+  updateProjectSummaryBox();
+});
+
+["c-fuente", "c-proyecto"].forEach((id) => {
   document.getElementById(id)?.addEventListener("change", () => {
     updateProjectSummaryBox();
   });
@@ -1492,10 +1612,7 @@ document
       id_proyecto: idProyecto,
     };
     try {
-      localStorage.setItem(
-        PROJECT_KEYS_KEY,
-        JSON.stringify(STATE.projectKeys)
-      );
+      localStorage.setItem(PROJECT_KEYS_KEY, JSON.stringify(STATE.projectKeys));
     } catch {}
 
     // Usamos ese código en el buscador de arriba

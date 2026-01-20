@@ -116,6 +116,82 @@ let dauxiliarCatalog = [];
 
 let editingMode = false;
 
+const DG_DAUXILIAR_FILTERS = {
+  A00: new Set(["100", "101", "122", "155", "172", "169", "137"]),
+  A01: new Set(["103"]),
+  A02: new Set(["102"]),
+  B01: new Set(["110"]),
+  B02: new Set(["110"]),
+  C01: new Set(["110"]),
+  C02: new Set(["110"]),
+  C03: new Set(["110"]),
+  C04: new Set(["110"]),
+  C05: new Set(["110"]),
+  C06: new Set(["110"]),
+  C07: new Set(["110"]),
+  C08: new Set(["110"]),
+  C09: new Set(["110"]),
+  C10: new Set(["110"]),
+  C11: new Set(["110"]),
+  C12: new Set(["110"]),
+  D00: new Set(["155", "114", "108", "109"]),
+  E00: new Set(["120", "121", "114"]),
+  F00: new Set(["123"]),
+  F01: new Set(["154"]),
+  G00: new Set(["160"]),
+  H00: new Set(["125", "126", "127", "128", "145", "147"]),
+  I00: new Set(["143"]),
+  I01: new Set(["112"]),
+  I02: new Set(["129", "153"]),
+  J00: new Set(["102", "111", "112", "144", "151"]),
+  K00: new Set(["134", "135", "136", "138", "139"]),
+  L00: new Set(["115", "116", "117", "118", "119", "137", "155"]),
+  M00: new Set(["155", "112"]),
+  N00: new Set(["131", "133", "137", "140", "149"]),
+  O00: new Set(["141", "150"]),
+  Q00: new Set(["104", "158"]),
+  T00: new Set(["105", "106"]),
+  V00: new Set(["152"]),
+  X00: new Set(["124"]),
+};
+
+function normalizeClave(value) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function getSelectedDgeneral() {
+  const sel = document.getElementById("idDgeneral");
+  if (!sel || !sel.value) return null;
+  return dgeneralCatalog.find((r) => String(r.id) === String(sel.value)) || null;
+}
+
+function applyDauxiliarFilters() {
+  const selectedDgeneral = getSelectedDgeneral();
+  const dgClave = normalizeClave(selectedDgeneral?.clave);
+  const allowed = DG_DAUXILIAR_FILTERS[dgClave];
+  const current = document.getElementById("idDauxiliar")?.value || "";
+  const rows = allowed
+    ? dauxiliarCatalog.filter((row) =>
+        allowed.has(normalizeClave(row.clave))
+      )
+    : dauxiliarCatalog;
+
+  const sel = document.getElementById("idDauxiliar");
+  if (!sel) return;
+
+  sel.innerHTML = `<option value="">Seleccione...</option>`;
+  rows.forEach((r) => {
+    const opt = document.createElement("option");
+    opt.value = String(r.id);
+    opt.textContent = `${r.clave} — ${r.dependencia}`;
+    sel.appendChild(opt);
+  });
+
+  if (current && rows.some((row) => String(row.id) === current)) {
+    sel.value = current;
+  }
+}
+
 // =====================================================
 //  UTILIDADES UI
 // =====================================================
@@ -192,16 +268,7 @@ async function fetchDauxiliarCatalog() {
 }
 
 function fillDauxiliarSelect() {
-  const sel = document.getElementById("idDauxiliar");
-  if (!sel) return;
-
-  sel.innerHTML = `<option value="">Seleccione...</option>`;
-  dauxiliarCatalog.forEach((r) => {
-    const opt = document.createElement("option");
-    opt.value = String(r.id);
-    opt.textContent = `${r.clave} — ${r.dependencia}`;
-    sel.appendChild(opt);
-  });
+   applyDauxiliarFilters();
 }
 
 // =====================================================
@@ -382,6 +449,8 @@ function abrirModalEditarUsuario(usuario) {
   document.getElementById("correo").value = usuario.correo || "";
   document.getElementById("idDgeneral").value = usuario.id_dgeneral ? String(usuario.id_dgeneral) : "";
 
+  
+
   const da = document.getElementById("idDauxiliar");
   if (da) da.value = usuario.id_dauxiliar ? String(usuario.id_dauxiliar) : "";
 
@@ -492,6 +561,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   } catch (e) {
     console.error("[DAUXILIAR] Error:", e);
     showAlert("No se pudo cargar el catálogo de dependencias (dauxiliar).", "danger");
+  }
+
+  const selDgeneral = document.getElementById("idDgeneral");
+  if (selDgeneral) {
+    selDgeneral.addEventListener("change", () => {
+      applyDauxiliarFilters();
+    });
   }
 
   const form = document.getElementById("usuarioForm");
