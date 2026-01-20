@@ -264,16 +264,6 @@ const DG_DAUXILIAR_FILTERS = {
   X00: new Set(["124"]),
 };
 
-const DAUXILIAR_PROYECTO_FILTERS = {
-  "116": new Set([
-    "0105020511",
-    "0401010104",
-    "0401010105",
-    "0402010104",
-    "0404010101",
-  ]),
-};
-
 function normalizeClave(value) {
   return String(value || "").trim().toUpperCase();
 }
