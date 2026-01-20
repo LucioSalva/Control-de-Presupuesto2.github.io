@@ -38,22 +38,21 @@
 
   // ✅ SOLO selecciona si existe opción (NO inventa opciones falsas)
   const setSelectVal = (name, value) => {
-  const el = $byName(name);
-  if (!el) return;
+    const el = $byName(name);
+    if (!el) return;
 
-  const v = value == null ? "" : String(value);
+    const v = value == null ? "" : String(value);
 
-  // si es INPUT (no select), asigna directo
-  if (el.tagName !== "SELECT") {
-    el.value = v;
-    return;
-  }
+    // si es INPUT (no select), asigna directo
+    if (el.tagName !== "SELECT") {
+      el.value = v;
+      return;
+    }
 
-  // si es SELECT, solo asigna si existe opción
-  const exists = Array.from(el.options).some((o) => String(o.value) === v);
-  el.value = exists ? v : "";
-};
-
+    // si es SELECT, solo asigna si existe opción
+    const exists = Array.from(el.options).some((o) => String(o.value) === v);
+    el.value = exists ? v : "";
+  };
 
   function safeNumber(n) {
     const x = Number(n);
@@ -87,6 +86,32 @@
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
     if (s.includes("T")) return s.split("T")[0];
     return s;
+  }
+
+  function getMonthCode(dateStr) {
+    if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return dateStr.split("-")[1];
+    }
+    const now = new Date();
+    return String(now.getMonth() + 1).padStart(2, "0");
+  }
+
+  function buildFolioNumber(tipo, dateStr, idRef) {
+    const month = getMonthCode(dateStr);
+    const keyId = idRef ? `cp_folio_${tipo}_${idRef}` : "";
+    if (keyId) {
+      const existing = localStorage.getItem(keyId);
+      if (existing) return existing;
+    }
+
+    const seqKey = `cp_folio_seq_${tipo}_${month}`;
+    const last = Number(localStorage.getItem(seqKey) || "0");
+    const next = last + 1;
+    localStorage.setItem(seqKey, String(next));
+
+    const folio = `ECA-${month}-${tipo}-${String(next).padStart(4, "0")}`;
+    if (keyId) localStorage.setItem(keyId, folio);
+    return folio;
   }
 
   // ---------------------------
@@ -219,7 +244,8 @@
       if (!Number.isFinite(id)) return;
       const opt = document.createElement("option");
       opt.value = String(id);
-      opt.textContent = `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`.trim();
+      opt.textContent =
+        `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`.trim();
       sel.appendChild(opt);
     });
   }
@@ -234,44 +260,41 @@
   // ---------------------------
   // Normaliza payload
   // ---------------------------
- function normalizePayload(p) {
-  const payload = p || {};
-  return {
-    id: payload.id ?? null,
-    folio_num: payload.folio_num ?? payload.no_suficiencia ?? null,
+  function normalizePayload(p) {
+    const payload = p || {};
+    return {
+      id: payload.id ?? null,
+      folio_num: payload.folio_num ?? payload.no_suficiencia ?? null,
 
-    fecha: formatFecha(payload.fecha),
-    dependencia: payload.dependencia ?? "",
-    dependencia_aux: payload.dependencia_aux ?? "",
-    id_dgeneral: payload.id_dgeneral ?? null,
-    id_dauxiliar: payload.id_dauxiliar ?? null,
+      fecha: formatFecha(payload.fecha),
+      dependencia: payload.dependencia ?? "",
+      dependencia_aux: payload.dependencia_aux ?? "",
+      id_dgeneral: payload.id_dgeneral ?? null,
+      id_dauxiliar: payload.id_dauxiliar ?? null,
 
-    id_proyecto: payload.id_proyecto ?? null,
-    id_fuente: payload.id_fuente ?? null,
-    clave_programatica: payload.clave_programatica ?? "",
+      id_proyecto: payload.id_proyecto ?? null,
+      id_fuente: payload.id_fuente ?? null,
+      clave_programatica: payload.clave_programatica ?? "",
 
-    mes_pago: payload.mes_pago ?? "",
+      mes_pago: payload.mes_pago ?? "",
 
-    meta: payload.meta ?? payload.justificacion_general ?? "",
+      meta: payload.meta ?? payload.justificacion_general ?? "",
 
-    subtotal: safeNumber(payload.subtotal),
-    iva: safeNumber(payload.iva),
-    isr: safeNumber(payload.isr),
-    ieps: safeNumber(payload.ieps),
-    total: safeNumber(payload.total),
-    cantidad_pago: safeNumber(payload.cantidad_pago ?? payload.total),
+      subtotal: safeNumber(payload.subtotal),
+      iva: safeNumber(payload.iva),
+      isr: safeNumber(payload.isr),
+      ieps: safeNumber(payload.ieps),
+      total: safeNumber(payload.total),
+      cantidad_pago: safeNumber(payload.cantidad_pago ?? payload.total),
 
-    cantidad_con_letra: payload.cantidad_con_letra ?? "",
-    impuesto_tipo: payload.impuesto_tipo ?? "NONE",
-    isr_tasa: payload.isr_tasa ?? "",
-    ieps_tasa: payload.ieps_tasa ?? "",
+      cantidad_con_letra: payload.cantidad_con_letra ?? "",
+      impuesto_tipo: payload.impuesto_tipo ?? "NONE",
+      isr_tasa: payload.isr_tasa ?? "",
+      ieps_tasa: payload.ieps_tasa ?? "",
 
-    detalle: Array.isArray(payload.detalle) ? payload.detalle : [],
-  };
-}
-
-
-
+      detalle: Array.isArray(payload.detalle) ? payload.detalle : [],
+    };
+  }
 
   // ---------------------------
   // Cargar data (API o LocalStorage)
@@ -299,15 +322,22 @@
 
         return payload;
       } catch (e) {
-        console.warn("[COMPROMETIDO] API falló, usando LocalStorage:", e.message);
+        console.warn(
+          "[COMPROMETIDO] API falló, usando LocalStorage:",
+          e.message
+        );
       }
     }
 
     const raw = localStorage.getItem("cp_last_suficiencia");
-    if (!raw) throw new Error("No hay datos. Primero guarda una Suficiencia o abre comprometido.html?id=XXX");
+    if (!raw)
+      throw new Error(
+        "No hay datos. Primero guarda una Suficiencia o abre comprometido.html?id=XXX"
+      );
 
     const obj = JSON.parse(raw);
-    if (!obj?.payload) throw new Error("cp_last_suficiencia no contiene payload válido.");
+    if (!obj?.payload)
+      throw new Error("cp_last_suficiencia no contiene payload válido.");
 
     return obj.payload;
   }
@@ -316,71 +346,70 @@
   // Render
   // ---------------------------
   function renderPayload(rawPayload) {
-  console.log("[COMPROMETIDO] rawPayload:", rawPayload);
-const payload = normalizePayload(rawPayload);
-console.log("[COMPROMETIDO] normalized:", payload);
-console.log("[COMPROMETIDO] detalle length:", payload.detalle?.length);
+    console.log("[COMPROMETIDO] rawPayload:", rawPayload);
+    const payload = normalizePayload(rawPayload);
+    console.log("[COMPROMETIDO] normalized:", payload);
+    console.log("[COMPROMETIDO] detalle length:", payload.detalle?.length);
 
-  // Folio
-  setVal(
-    "no_suficiencia",
-    payload.folio_num != null ? String(payload.folio_num).padStart(6, "0") : ""
-  );
+    // Folio
+    const folioComprometido = buildFolioNumber(
+      "CP",
+      payload.fecha,
+      payload.id || getQueryId()
+    );
+    setVal("no_suficiencia", folioComprometido);
+    // Generales
+    setVal("fecha", payload.fecha);
+    setVal("dependencia", payload.dependencia);
+    setVal("dependencia_aux", payload.dependencia_aux || "");
 
-  // Generales
-  setVal("fecha", payload.fecha);
-  setVal("dependencia", payload.dependencia);
-  setVal("dependencia_aux", payload.dependencia_aux || "");
+    // Proyecto y fuente (SELECTs)
+    setSelectVal(
+      "id_proyecto",
+      payload.id_proyecto != null ? String(payload.id_proyecto) : ""
+    );
 
+    setSelectVal(
+      "fuente",
+      payload.id_fuente != null ? String(payload.id_fuente) : ""
+    );
 
-  // Proyecto y fuente (SELECTs)
-  setSelectVal(
-    "id_proyecto",
-    payload.id_proyecto != null ? String(payload.id_proyecto) : ""
-  );
+    // Clave programática (inputs readonly)
+    setVal("clave_programatica", payload.clave_programatica || "");
+    setVal("id_proyecto_programatico", payload.clave_programatica || ""); // por compatibilidad
 
-  setSelectVal(
-    "fuente",
-    payload.id_fuente != null ? String(payload.id_fuente) : ""
-  );
+    // Si tienes campo "programa" en comprometido.html
+    setVal("programa", payload.programa_text || "");
 
-  // Clave programática (inputs readonly)
-  setVal("clave_programatica", payload.clave_programatica || "");
-  setVal("id_proyecto_programatico", payload.clave_programatica || ""); // por compatibilidad
+    // Hidden id_fuente (si existe)
+    setVal("id_fuente", payload.id_fuente ?? "");
 
-  // Si tienes campo "programa" en comprometido.html
-  setVal("programa", payload.programa_text || "");
+    // Pago
+    setVal("mes_pago", payload.mes_pago || "");
+    setVal("cantidad_pago", safeNumber(payload.cantidad_pago).toFixed(2));
 
-  // Hidden id_fuente (si existe)
-  setVal("id_fuente", payload.id_fuente ?? "");
+    // Totales
+    setVal("meta", payload.meta || "");
+    setVal("subtotal", safeNumber(payload.subtotal).toFixed(2));
+    setVal("iva", safeNumber(payload.iva).toFixed(2));
+    setVal("isr", safeNumber(payload.isr).toFixed(2));
+    setVal("ieps", safeNumber(payload.ieps).toFixed(2));
+    setVal("total", safeNumber(payload.total).toFixed(2));
+    setVal("cantidad_con_letra", payload.cantidad_con_letra || "");
 
-  // Pago
-  setVal("mes_pago", payload.mes_pago || "");
-  setVal("cantidad_pago", safeNumber(payload.cantidad_pago).toFixed(2));
+    // Impuestos
+    setImpuestoTipo(payload.impuesto_tipo);
+    setVal("isr_tasa", payload.isr_tasa ?? "");
+    setVal("ieps_tasa", payload.ieps_tasa ?? "");
 
-  // Totales
-  setVal("meta", payload.meta || "");
-  setVal("subtotal", safeNumber(payload.subtotal).toFixed(2));
-  setVal("iva", safeNumber(payload.iva).toFixed(2));
-  setVal("isr", safeNumber(payload.isr).toFixed(2));
-  setVal("ieps", safeNumber(payload.ieps).toFixed(2));
-  setVal("total", safeNumber(payload.total).toFixed(2));
-  setVal("cantidad_con_letra", payload.cantidad_con_letra || "");
+    // Detalle
+    renderDetalle(payload.detalle);
 
-  // Impuestos
-  setImpuestoTipo(payload.impuesto_tipo);
-  setVal("isr_tasa", payload.isr_tasa ?? "");
-  setVal("ieps_tasa", payload.ieps_tasa ?? "");
+    // Descripción bajo clave programática
+    updateClaveProgDescFromProyectoId(payload.id_proyecto);
 
-  // Detalle
-  renderDetalle(payload.detalle);
-
-  // Descripción bajo clave programática
-  updateClaveProgDescFromProyectoId(payload.id_proyecto);
-
-  return payload;
-}
-
+    return payload;
+  }
 
   // ---------------------------
   // PDF (deja tu función real)
@@ -429,8 +458,12 @@ console.log("[COMPROMETIDO] detalle length:", payload.detalle?.length);
 
     try {
       // ✅ 1) Carga catálogos primero (si tu HTML tiene selects)
-      await loadProyectosCatalog().catch((e) => console.warn("[COMPROMETIDO] proyectos:", e.message));
-      await loadFuentesCatalog().catch((e) => console.warn("[COMPROMETIDO] fuentes:", e.message));
+      await loadProyectosCatalog().catch((e) =>
+        console.warn("[COMPROMETIDO] proyectos:", e.message)
+      );
+      await loadFuentesCatalog().catch((e) =>
+        console.warn("[COMPROMETIDO] fuentes:", e.message)
+      );
 
       // ✅ 2) Carga payload
       const raw = await loadData();

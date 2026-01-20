@@ -449,7 +449,7 @@ function abrirModalEditarUsuario(usuario) {
   document.getElementById("correo").value = usuario.correo || "";
   document.getElementById("idDgeneral").value = usuario.id_dgeneral ? String(usuario.id_dgeneral) : "";
 
-  
+  applyDauxiliarFilters();
 
   const da = document.getElementById("idDauxiliar");
   if (da) da.value = usuario.id_dauxiliar ? String(usuario.id_dauxiliar) : "";

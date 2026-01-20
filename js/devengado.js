@@ -89,6 +89,32 @@
     return s;
   }
 
+  function getMonthCode(dateStr) {
+    if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return dateStr.split("-")[1];
+    }
+    const now = new Date();
+    return String(now.getMonth() + 1).padStart(2, "0");
+  }
+
+  function buildFolioNumber(tipo, dateStr, idRef) {
+    const month = getMonthCode(dateStr);
+    const keyId = idRef ? `cp_folio_${tipo}_${idRef}` : "";
+    if (keyId) {
+      const existing = localStorage.getItem(keyId);
+      if (existing) return existing;
+    }
+
+    const seqKey = `cp_folio_seq_${tipo}_${month}`;
+    const last = Number(localStorage.getItem(seqKey) || "0");
+    const next = last + 1;
+    localStorage.setItem(seqKey, String(next));
+
+    const folio = `ECA-${month}-${tipo}-${String(next).padStart(4, "0")}`;
+    if (keyId) localStorage.setItem(keyId, folio);
+    return folio;
+  }
+
   // ---------------------------
   // Render DETALLE
   // ---------------------------
@@ -322,10 +348,12 @@ console.log("[COMPROMETIDO] normalized:", payload);
 console.log("[COMPROMETIDO] detalle length:", payload.detalle?.length);
 
   // Folio
-  setVal(
-    "no_suficiencia",
-    payload.folio_num != null ? String(payload.folio_num).padStart(6, "0") : ""
+  const folioDevengado = buildFolioNumber(
+    "DV",
+    payload.fecha,
+    payload.id || getQueryId()
   );
+  setVal("no_suficiencia", folioDevengado);
 
   // Generales
   setVal("fecha", payload.fecha);
