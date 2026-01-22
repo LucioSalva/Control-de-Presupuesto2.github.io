@@ -81,7 +81,7 @@
       <button id="btn-ver-comprometido" class="btn btn-outline-primary btn-sm">
         <i class="bi bi-box-arrow-up-right me-1"></i>Ver comprometido
       </button>
-      
+
       <button id="btn-ver-devengado" class="btn btn-outline-primary btn-sm">
         <i class="bi bi-box-arrow-up-right me-1"></i>Ver devengado
       </button>
@@ -191,85 +191,88 @@
 
     <!-- DATOS GENERALES (3 filas x 2 campos) -->
     <table class="table table-bordered mb-2 formato">
-  <colgroup>
-    <col class="c-lbl">
-    <col class="c-val">
-    <col class="c-lbl">
-    <col class="c-val">
-  </colgroup>
+      <colgroup>
+        <col class="c-lbl">
+        <col class="c-val">
+        <col class="c-lbl">
+        <col class="c-val">
+      </colgroup>
 
-  <!-- ROW 1: FECHA -->
-  <tr>
-    <th class="table-header">FECHA DE ELABORACIÓN:</th>
-    <td colspan="3">
-      <input type="date" class="form-control form-control-sm as-text text-strong td-text" name="fecha" readonly>
-    </td>
-  </tr>
+      <!-- ROW 1: FECHA -->
+      <tr>
+        <th class="table-header">FECHA DE ELABORACIÓN:</th>
+        <td colspan="3">
+          <input type="date" class="form-control form-control-sm as-text text-strong td-text" name="fecha" readonly>
+        </td>
+      </tr>
 
-  <!-- ROW 2: DEPENDENCIA GENERAL + AUX -->
-  <tr>
-    <th class="table-header">NOMBRE DE LA DEPENDENCIA GENERAL:</th>
-    <td>
-      <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia" readonly>
-      <input type="hidden" name="id_dgeneral">
-    </td>
+      <!-- ROW 2: DEPENDENCIA GENERAL + AUX -->
+      <tr>
+        <th class="table-header">NOMBRE DE LA DEPENDENCIA GENERAL:</th>
+        <td>
+          <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia"
+            readonly>
+          <input type="hidden" name="id_dgeneral">
+        </td>
 
-    <th class="table-header">NOMBRE DE LA DEPENDENCIA AUXILIAR:</th>
-    <td>
-      <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia_aux" readonly>
-      <input type="hidden" name="id_dauxiliar">
-    </td>
-  </tr>
+        <th class="table-header">NOMBRE DE LA DEPENDENCIA AUXILIAR:</th>
+        <td>
+          <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia_aux"
+            readonly>
+          <input type="hidden" name="id_dauxiliar">
+        </td>
+      </tr>
 
-  <!-- ROW 3: PROYECTO + FUENTE -->
-  <tr>
-    <th class="table-header">PROYECTO:</th>
-    <td>
-      <select class="form-select form-select-sm" name="id_proyecto">
-        <option value="">-- Selecciona un proyecto --</option>
-      </select>
-    </td>
+      <!-- ROW 3: PROYECTO + FUENTE -->
+      <tr>
+        <th class="table-header">PROYECTO:</th>
+        <td>
+          <select class="form-select form-select-sm" name="id_proyecto">
+            <option value="">-- Selecciona un proyecto --</option>
+          </select>
+        </td>
 
-    <th class="table-header">FUENTE DE FINANCIAMIENTO:</th>
-    <td>
-      <select class="form-select form-select-sm" name="fuente">
-        <option value="">-- Selecciona una fuente --</option>
-      </select>
-      <input type="hidden" name="id_fuente">
-    </td>
-  </tr>
+        <th class="table-header">FUENTE DE FINANCIAMIENTO:</th>
+        <td>
+          <select class="form-select form-select-sm" name="fuente">
+            <option value="">-- Selecciona una fuente --</option>
+          </select>
+          <input type="hidden" name="id_fuente">
+        </td>
+      </tr>
 
-  <!-- ROW 4: CLAVE + PROGRAMACION -->
-  <tr>
-    <th class="table-header">CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:</th>
-    <td>
-      <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="clave_programatica" readonly>
-      <div class="small mt-1 text-muted" id="claveProgDesc">—</div>
-    </td>
+      <!-- ROW 4: CLAVE + PROGRAMACION -->
+      <tr>
+        <th class="table-header">CLAVE PROGRAMÁTICA:</th>
+        <td>
+          <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="clave_programatica"
+            readonly>
+          <div class="small mt-1 text-muted" id="claveProgDesc">—</div>
+        </td>
 
-    <th class="table-header table-header-strong">PROGRAMACIÓN DE PAGO:</th>
-    <td>
-      <select class="form-select form-select-sm" name="mes_pago">
-        <option value="ENERO">ENERO</option>
-        <option value="FEBRERO">FEBRERO</option>
-        <option value="MARZO">MARZO</option>
-        <option value="ABRIL">ABRIL</option>
-        <option value="MAYO">MAYO</option>
-        <option value="JUNIO">JUNIO</option>
-        <option value="JULIO">JULIO</option>
-        <option value="AGOSTO">AGOSTO</option>
-        <option value="SEPTIEMBRE">SEPTIEMBRE</option>
-        <option value="OCTUBRE">OCTUBRE</option>
-        <option value="NOVIEMBRE">NOVIEMBRE</option>
-        <option value="DICIEMBRE">DICIEMBRE</option>
-      </select>
+        <th class="table-header table-header-strong">PROGRAMACIÓN DE PAGO:</th>
+        <td>
+          <select class="form-select form-select-sm" name="mes_pago">
+            <option value="ENERO">ENERO</option>
+            <option value="FEBRERO">FEBRERO</option>
+            <option value="MARZO">MARZO</option>
+            <option value="ABRIL">ABRIL</option>
+            <option value="MAYO">MAYO</option>
+            <option value="JUNIO">JUNIO</option>
+            <option value="JULIO">JULIO</option>
+            <option value="AGOSTO">AGOSTO</option>
+            <option value="SEPTIEMBRE">SEPTIEMBRE</option>
+            <option value="OCTUBRE">OCTUBRE</option>
+            <option value="NOVIEMBRE">NOVIEMBRE</option>
+            <option value="DICIEMBRE">DICIEMBRE</option>
+          </select>
 
-      <input type="text"
-        class="form-control form-control-sm as-text td-text text-strong text-end input-no-click mt-2"
-        name="cantidad_pago" placeholder="Cantidad" readonly>
-    </td>
-  </tr>
-</table>
+          <input type="text"
+            class="form-control form-control-sm as-text td-text text-strong text-end input-no-click mt-2"
+            name="cantidad_pago" placeholder="Cantidad" readonly>
+        </td>
+      </tr>
+    </table>
 
 
     <!-- Detalle (dinámico) -->
@@ -302,13 +305,18 @@
     <!-- META + TOTALES -->
     <table class="table table-bordered mb-2">
       <tr>
-        <th class="table-header align-middle text-center" style="width:15%; background-color: rgb(180, 180, 180);" rowspan="5">
+        <th class="table-header align-middle text-center" style="width:15%; background-color: rgb(180, 180, 180);"
+          rowspan="5">
           META:
         </th>
 
         <td class="align-middle" style="width:65%;" rowspan="5">
           <div class="d-flex align-items-center h-100">
-            <input type="text" class="form-control form-control-sm" name="meta" placeholder="Escribe la meta...">
+            <select class="form-select form-select-sm" name="id_meta">
+              <option value="">-- Selecciona una meta --</option>
+            </select>
+            <input type="hidden" name="meta">
+
           </div>
         </td>
 
@@ -346,33 +354,6 @@
         </td>
       </tr>
     </table>
-
-    <div class="d-flex flex-wrap align-items-center justify-content-end gap-3 mb-3">
-      <div class="form-check m-0">
-        <input class="form-check-input" type="radio" name="impuesto_tipo" value="NONE" checked>
-        <label class="form-check-label">Sin impuesto</label>
-      </div>
-      <div class="form-check m-0">
-        <input class="form-check-input" type="radio" name="impuesto_tipo" value="IVA">
-        <label class="form-check-label">IVA 16%</label>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <div class="form-check m-0">
-          <input class="form-check-input" type="radio" name="impuesto_tipo" value="ISR">
-          <label class="form-check-label">ISR</label>
-        </div>
-        <input type="number" class="form-control form-control-sm text-end" name="isr_tasa" style="width:120px;"
-          placeholder="Ej. 10 %" min="0" step="0.01" disabled />
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <div class="form-check m-0">
-          <input class="form-check-input" type="radio" name="impuesto_tipo" value="IEPS">
-          <label class="form-check-label">IEPS</label>
-        </div>
-        <input type="number" class="form-control form-control-sm text-end" name="ieps_tasa" style="width:120px;"
-          placeholder="Ej. 8 %" min="0" step="0.01" disabled />
-    </div>
-
     <table class="table table-bordered mb-4">
       <tr>
         <th class="table-header" style="width: 15%; background-color: rgb(180, 180, 180);">CANTIDAD CON LETRA:</th>
@@ -381,6 +362,53 @@
         </td>
       </tr>
     </table>
+
+    <div class="d-flex flex-wrap align-items-center justify-content-end gap-3 mb-3">
+
+  <div class="form-check m-0">
+    <input class="form-check-input" type="checkbox" name="imp_iva" id="imp_iva">
+    <label class="form-check-label" for="imp_iva">IVA 16%</label>
+  </div>
+
+  <div class="d-flex align-items-center gap-2">
+    <div class="form-check m-0">
+      <input class="form-check-input" type="checkbox" name="imp_isr" id="imp_isr">
+      <label class="form-check-label" for="imp_isr">ISR</label>
+    </div>
+    <input
+      type="number"
+      class="form-control form-control-sm text-end"
+      name="isr_tasa"
+      style="width:120px;"
+      placeholder="Ej. 10 %"
+      min="0"
+      max="100"
+      step="0.01"
+      disabled
+    />
+  </div>
+
+  <div class="d-flex align-items-center gap-2">
+    <div class="form-check m-0">
+      <input class="form-check-input" type="checkbox" name="imp_ieps" id="imp_ieps">
+      <label class="form-check-label" for="imp_ieps">IEPS</label>
+    </div>
+    <input
+      type="number"
+      class="form-control form-control-sm text-end"
+      name="ieps_tasa"
+      style="width:120px;"
+      placeholder="Ej. 8 %"
+      min="0"
+      max="100"
+      step="0.01"
+      disabled
+    />
+  </div>
+
+</div>
+
+    <br>
 
     <div class="border p-2" style="font-size:11px; text-align:justify; background-color: rgb(180, 180, 180);">
       <p class="mb-2">
@@ -424,8 +452,8 @@
         <td style="height:70px;"></td>
       </tr>
     </table>
-
   </div>
+
 
   <!-- Modal confirmación -->
   <div class="modal fade" id="modalConfirm" tabindex="-1" aria-hidden="true">

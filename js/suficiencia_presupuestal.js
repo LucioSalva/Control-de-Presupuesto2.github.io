@@ -1,4 +1,4 @@
-(() => {
+((() => {
   const MAX_ROWS = 20;
   const START_ROWS = 3;
 
@@ -20,7 +20,6 @@
   const btnVerComprometido = document.getElementById("btn-ver-comprometido");
   const btnVerDevengado = document.getElementById("btn-ver-devengado");
 
-  // OJO: en tu HTML el botón es btn-export-xlsx
   const btnExportXlsx = document.getElementById("btn-export-xlsx");
 
   const btnAddRow = document.getElementById("btn-add-row");
@@ -143,9 +142,7 @@
 
     const folios = rows
       .map((r) =>
-        String(
-          r.no_suficiencia ?? r.folio_num ?? r.numero_suficiencia ?? ""
-        ).trim()
+        String(r.no_suficiencia ?? r.folio_num ?? r.numero_suficiencia ?? "").trim()
       )
       .filter(Boolean);
 
@@ -158,9 +155,7 @@
 
   async function buscarPorNumero(numero) {
     const num = pad6(numero);
-    const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(
-      num
-    )}`;
+    const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(num)}`;
     const json = await fetchJson(url, { headers: { ...authHeaders() } });
     renderResultadosBusqueda(json?.data || []);
   }
@@ -208,7 +203,6 @@
 
   // ---------------------------
   // Folio (No. Suficiencia)
-  // ✅ NO se muestra hasta guardar (evita duplicados por concurrencia)
   // ---------------------------
   function initFolioUI() {
     setVal("no_suficiencia", "");
@@ -235,6 +229,270 @@
     }
   }
 
+  // =====================================================
+  // ✅ CANDADOS: (DG + DAUX) -> PROYECTOS permitidos
+  // Se valida por: "CLAVE|CONAC"  (ej: "0105020511|O")
+  // =====================================================
+  const DG_DA_PROYECTOS_FILTERS = {
+    A00: {
+      "100": new Set(["0103010101|P", "0103010103|E"]),
+      "101": new Set(["0105020609|M", "0105020508|P"]),
+      "122": new Set(["0108040101|E"]),
+      "155": new Set(["0108010101|E"]),
+      "172": new Set(["0206080502|S", "0301020301|E", "0301020302|S"]),
+      "169": new Set(["0202020101|S"]),
+      "137": new Set(["0108030103|F"]),
+    },
+    A01: { "103": new Set(["0108030103|F"]) },
+    A02: { "102": new Set(["0102040102|E", "0102040103|E"]) },
+
+    B01: { "110": new Set(["0202020102|M"]) },
+    B02: { "110": new Set(["0202020102|M"]) },
+
+    C01: { "110": new Set(["0202020102|M"]) },
+    C02: { "110": new Set(["0202020102|M"]) },
+    C03: { "110": new Set(["0202020102|M"]) },
+    C04: { "110": new Set(["0202020102|M"]) },
+    C05: { "110": new Set(["0202020102|M"]) },
+    C06: { "110": new Set(["0202020102|M"]) },
+    C07: { "110": new Set(["0202020102|M"]) },
+    C08: { "110": new Set(["0202020102|M"]) },
+    C09: { "110": new Set(["0202020102|M"]) },
+    C10: { "110": new Set(["0202020102|M"]) },
+    C11: { "110": new Set(["0202020102|M"]) },
+    C12: { "110": new Set(["0202020102|M"]) },
+
+    D00: {
+      "155": new Set(["0103090201|M"]),
+      "114": new Set(["0105020606|M"]),
+      "108": new Set(["0103090301|L"]),
+      "109": new Set(["0108010102|E"]),
+    },
+
+    E00: {
+      "120": new Set(["0105020105|E", "0105020601|P", "0105020602|M"]),
+      "121": new Set(["0105020603|M"]),
+      "114": new Set(["0105020606|M"]),
+    },
+
+    F00: {
+      "123": new Set([
+        "0103080104|P",
+        "0103080107|M",
+        "0202010106|K",
+        "0202050104|E",
+        "0108010301|E",
+      ]),
+    },
+
+    F01: {
+      "154": new Set([
+        "0202010111|K",
+        "0107010108|E",
+        "0305010111|E",
+        "0105020602|M",
+      ]),
+    },
+
+    G00: {
+      "160": new Set([
+        "0201040109|V",
+        "0201050101|F",
+        "0201050102|V",
+        "0302020103|V",
+        "0302020105|V",
+      ]),
+    },
+
+    H00: {
+      "125": new Set(["0202010110|K", "0201010101|V"]),
+      "126": new Set(["0201010102|E"]),
+      "127": new Set(["0303050103|E", "0303050104|E"]),
+      "128": new Set(["0202060103|E"]),
+      "145": new Set(["0202060104|E"]),
+      "147": new Set(["0202060106|E"]),
+    },
+
+    I00: { "143": new Set(["0206080602|E", "0206080603|E", "0206080604|E"]) },
+
+    I01: { "112": new Set(["0202020101|S", "0202020102|M"]) },
+
+    I02: {
+      "129": new Set(["0201050201|E", "0201050202|E", "0201050203|E"]),
+      "153": new Set([
+        "0203010108|E",
+        "0203020115|S",
+        "0206080502|S",
+        "0206080503|E",
+        "0206080504|E",
+      ]),
+    },
+
+    J00: {
+      "102": new Set(["0102040102|E"]),
+      "111": new Set(["0204040102|E"]),
+      "112": new Set(["0108010101|E"]),
+      "144": new Set(["0103020104|E"]),
+      "151": new Set(["0206070101|P"]),
+    },
+
+    K00: {
+      "134": new Set(["0103040101|O"]),
+      "135": new Set(["0103040101|O"]),
+      "136": new Set(["0103040201|O"]),
+      "138": new Set(["0103040202|O", "0103040203|O", "0103040205|O"]),
+      "139": new Set(["0103040102|P"]),
+    },
+
+    L00: {
+      "115": new Set(["0105020201|E", "0105020209|E", "0402010103|C"]),
+      "116": new Set([
+        "0105020511|O",
+        "0401010104|D",
+        "0401010105|D",
+        "0402010104|O",
+        "0404010101|H",
+      ]),
+      "117": new Set(["0105020510|O"]),
+      "118": new Set(["0108010201|E"]),
+      "119": new Set(["0105020304|K", "0105020508|P"]),
+      "137": new Set(["0108050103|E"]),
+      "155": new Set(["0103050104|L"]),
+    },
+
+    M00: { "155": new Set(["0103050104|L"]), "112": new Set(["0108010101|E"]) },
+
+    N00: {
+      "131": new Set(["0304020102|F"]),
+      "133": new Set(["0309030104|F"]),
+      "137": new Set(["0105020608|O"]),
+      "140": new Set(["0301020106|M", "0301020107|E"]),
+      "149": new Set(["0307010101|F"]),
+    },
+
+    O00: {
+      "141": new Set([
+        "0205010110|S",
+        "0205020105|S",
+        "0205030105|S",
+        "0205050101|S",
+        "0205050102|S",
+      ]),
+      "150": new Set(["0103030101|E", "0204020101|F"]),
+    },
+
+    Q00: {
+      "104": new Set([
+        "0107010101|E",
+        "0107010102|M",
+        "0107010103|P",
+        "0107010105|E",
+        "0107040101|S",
+      ]),
+      "158": new Set(["0107010108|E"]),
+    },
+
+    T00: {
+      "105": new Set([
+        "0107020101|E",
+        "0107020103|M",
+        "0107020104|E",
+        "0107020105|N",
+        "0107020106|N",
+      ]),
+      "106": new Set(["0107020102|N", "0302020105|V"]),
+    },
+
+    V00: {
+      "152": new Set([
+        "0107010102|M",
+        "0206080501|E",
+        "0206080502|S",
+        "0206080503|E",
+        "0301020301|E",
+      ]),
+    },
+
+    X00: {
+      "124": new Set([
+        "0201030101|K",
+        "0202010109|K",
+        "0202010110|K",
+        "0202010111|K",
+        "0202010112|K",
+        "0202010113|K",
+        "0202030105|K",
+      ]),
+    },
+  };
+
+  function _norm(v) {
+    return String(v || "").trim().toUpperCase();
+  }
+  function _normNum(v) {
+    return String(v || "").trim();
+  }
+
+  // null => no hay reglas para ese DG (no candado)
+  // Set vacío => DG sí existe pero DA no (candado estricto => sin proyectos)
+  function getAllowedProyectoSet() {
+    const dg = _norm(dgeneralInfo?.clave);
+    const da = _normNum(dauxiliarInfo?.clave);
+    if (!dg || !da) return null;
+
+    const dgRules = DG_DA_PROYECTOS_FILTERS[dg];
+    if (!dgRules) return null;
+
+    return dgRules[da] || new Set();
+  }
+
+  // ✅ PINTA SELECT (filtrado o sin filtrar)
+  function applyProyectoFilters() {
+    const sel = document.querySelector('[name="id_proyecto"]');
+    if (!sel) return;
+
+    const all = Object.values(proyectosById || {});
+    if (!all.length) return; // aún no carga nada
+
+    const allowed = getAllowedProyectoSet();
+    const current = sel.value || "";
+
+    const rows =
+      allowed === null
+        ? all
+        : all.filter((p) => {
+            let clave = String(p?.clave ?? "").trim().replace(/[^\d]/g, "");
+            if (clave) clave = clave.padStart(10, "0");
+            const conac = _norm(p?.conac);
+            return allowed.has(`${clave}|${conac}`);
+          });
+
+    sel.innerHTML = `<option value="">-- Selecciona un proyecto --</option>`;
+
+    rows.forEach((p) => {
+      const opt = document.createElement("option");
+      const clave = String(p.clave || "").trim();
+      const conac = String(p.conac || "").trim();
+      const claveConac = conac ? `${clave} ${conac}` : clave;
+
+      opt.value = String(p.id);
+      opt.textContent = `${claveConac} - ${p.descripcion}`.trim();
+      sel.appendChild(opt);
+    });
+
+    if (current && rows.some((p) => String(p.id) === String(current))) {
+      sel.value = current;
+    } else {
+      sel.value = "";
+    }
+
+    // al cambiar proyectos disponibles, resetea meta
+    setVal("id_meta", "");
+    setVal("meta", "");
+
+    updateClaveProgramatica();
+  }
+
   // ---------------------------
   // Dependencias desde usuario (dgeneral + dauxiliar)
   // ---------------------------
@@ -250,27 +508,23 @@
     setVal("id_dauxiliar", idDa ?? "");
 
     const [dgCatalog, daCatalog] = await Promise.all([
-      fetchJson(`${API}/api/catalogos/dgeneral`, {
-        headers: { ...authHeaders() },
-      }),
-      fetchJson(`${API}/api/catalogos/dauxiliar`, {
-        headers: { ...authHeaders() },
-      }),
+      fetchJson(`${API}/api/catalogos/dgeneral`, { headers: { ...authHeaders() } }),
+      fetchJson(`${API}/api/catalogos/dauxiliar`, { headers: { ...authHeaders() } }),
     ]);
 
     dgeneralInfo = (dgCatalog || []).find((x) => Number(x.id) === idDg) || null;
-    dauxiliarInfo =
-      (daCatalog || []).find((x) => Number(x.id) === idDa) || null;
+    dauxiliarInfo = (daCatalog || []).find((x) => Number(x.id) === idDa) || null;
 
-    const depGenNombre =
-      dgeneralInfo?.dependencia || user?.dgeneral_nombre || "";
-    const depAuxNombre =
-      dauxiliarInfo?.dependencia || user?.dauxiliar_nombre || "";
+    const depGenNombre = dgeneralInfo?.dependencia || user?.dgeneral_nombre || "";
+    const depAuxNombre = dauxiliarInfo?.dependencia || user?.dauxiliar_nombre || "";
 
     setVal("dependencia", depGenNombre);
     setVal("dependencia_aux", depAuxNombre);
 
     updateClaveProgramatica();
+
+    // ✅ si proyectos ya cargaron, reaplica filtros
+    if (Object.keys(proyectosById || {}).length) applyProyectoFilters();
   }
 
   // ---------------------------
@@ -284,32 +538,44 @@
     proyectosById = {};
     const items = Array.isArray(data) ? data : [];
 
+    const parseClaveConac = (claveRaw, conacRaw) => {
+      let clave = String(claveRaw ?? "").trim();
+      let conac = String(conacRaw ?? "").trim();
+
+      // Caso: "0108050103 E" en clave y conac vacío
+      const parts = clave.split(/\s+/).filter(Boolean);
+      if (!conac && parts.length >= 2) {
+        const last = parts[parts.length - 1];
+        if (/^[A-Z]$/i.test(last)) {
+          conac = last.toUpperCase();
+          clave = parts.slice(0, -1).join("").trim();
+        }
+      }
+
+      // Limpia a solo dígitos
+      clave = clave.replace(/[^\d]/g, "");
+
+      // ✅ NORMALIZA A 10 DÍGITOS
+      if (clave) clave = clave.padStart(10, "0");
+
+      // Normaliza conac
+      conac = String(conac || "").trim().toUpperCase();
+
+      return { clave, conac };
+    };
+
     items.forEach((p) => {
       const id = Number(p.id);
       if (!Number.isFinite(id)) return;
 
+      const parsed = parseClaveConac(p.clave, p.conac);
+
       proyectosById[id] = {
         id,
-        clave: String(p.clave ?? "").trim(),
-        conac: String(p.conac ?? "").trim(),
+        clave: parsed.clave,
+        conac: parsed.conac,
         descripcion: String(p.descripcion ?? "").trim(),
       };
-    });
-
-    const sel = document.querySelector('[name="id_proyecto"]');
-    if (!sel) return;
-
-    sel.innerHTML = `<option value="">-- Selecciona un proyecto --</option>`;
-
-    Object.values(proyectosById).forEach((p) => {
-      const opt = document.createElement("option");
-      const clave = String(p.clave || "").trim();
-      const conac = String(p.conac || "").trim();
-      const claveConac = conac ? `${clave} ${conac}` : clave;
-
-      opt.value = String(p.id);
-      opt.textContent = `${claveConac} - ${p.descripcion}`.trim();
-      sel.appendChild(opt);
     });
   }
 
@@ -338,24 +604,19 @@
       "fuente",
       data,
       (x) => x.id,
-      (x) =>
-        `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`
+      (x) => `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`
     );
   }
 
-  // ✅ Cuando eligen fuente, guardamos id_fuente al hidden
   function bindFuenteToHidden() {
     const sel = document.querySelector('[name="fuente"]');
     if (!sel) return;
-    sel.addEventListener("change", () => {
-      setVal("id_fuente", sel.value || "");
-    });
-    // inicial
+    sel.addEventListener("change", () => setVal("id_fuente", sel.value || ""));
     setVal("id_fuente", sel.value || "");
   }
 
   // ---------------------------
-  // ✅ Clave programática (DG + DA + PROYECTO(CLAVE + CONAC))
+  // ✅ Clave programática
   // ---------------------------
   function updateClaveProgramatica() {
     const idProyecto = Number(get("id_proyecto") || 0);
@@ -374,6 +635,73 @@
 
     const descEl = document.getElementById("claveProgDesc");
     if (descEl) descEl.textContent = p?.descripcion || "—";
+  }
+
+  // =====================================================
+  // ✅ METAS: cargar por combinación DG + DA + PROY + CONAC
+  // =====================================================
+  async function loadMetasForCurrentSelection() {
+    const selMeta = document.querySelector('[name="id_meta"]');
+    if (!selMeta) return;
+
+    // limpia
+    selMeta.innerHTML = `<option value="">-- Selecciona una meta --</option>`;
+    setVal("meta", ""); // ✅ limpia el texto también
+
+    // datos necesarios
+    const dg = String(dgeneralInfo?.clave || "").trim();
+    const da = String(dauxiliarInfo?.clave || "").trim();
+
+    const idProyecto = Number(get("id_proyecto") || 0);
+    const p = proyectosById[idProyecto];
+
+    const proy_clave = String(p?.clave || "").trim();
+    const conac = String(p?.conac || "").trim();
+
+    // si falta algo, no consultes
+    if (!dg || !da || !proy_clave || !conac) return;
+
+    const qs = new URLSearchParams({
+      dg_clave: dg,
+      da_clave: da,
+      proy_clave,
+      conac,
+    });
+
+    const url = `${API}/api/catalogos/metas?${qs.toString()}`;
+
+    let data;
+    try {
+      data = await fetchJson(url, { headers: { ...authHeaders() } });
+    } catch (e) {
+      console.warn("[META] no se pudo cargar metas:", e.message);
+      return;
+    }
+
+    const rows = Array.isArray(data) ? data : (data?.data || []);
+    if (!rows.length) return;
+
+    for (const r of rows) {
+      const texto = String(r.meta || r.descripcion || "").trim();
+      if (!texto) continue;
+
+      const opt = document.createElement("option");
+      opt.value = r.id != null ? String(r.id) : texto;
+      opt.textContent = texto;
+      selMeta.appendChild(opt);
+    }
+  }
+
+  // ✅ Opción A: al cambiar id_meta, guarda el texto en hidden meta
+  function bindMetaToHidden() {
+    const sel = document.querySelector('[name="id_meta"]');
+    if (!sel) return;
+
+    sel.addEventListener("change", () => {
+      const txt = sel.selectedOptions?.[0]?.textContent?.trim() || "";
+      // si está en placeholder, no guardes texto
+      setVal("meta", sel.value ? txt : "");
+    });
   }
 
   // ---------------------------
@@ -438,9 +766,7 @@
   }
 
   function renumberRows() {
-    const rows = detalleBody
-      ? Array.from(detalleBody.querySelectorAll("tr"))
-      : [];
+    const rows = detalleBody ? Array.from(detalleBody.querySelectorAll("tr")) : [];
     rows.forEach((tr, idx) => {
       const i = idx + 1;
       tr.setAttribute("data-row", String(i));
@@ -506,12 +832,22 @@
     return (detalle || []).reduce((acc, r) => acc + safeNumber(r?.importe), 0);
   }
 
-  function getImpuestoTipo() {
-    return (
-      document.querySelector('input[name="impuesto_tipo"]:checked')?.value ||
-      "NONE"
-    );
-  }
+  function getImpuestosSeleccionados() {
+  const iva = !!document.querySelector('[name="imp_iva"]')?.checked;
+  const isr = !!document.querySelector('[name="imp_isr"]')?.checked;
+  const ieps = !!document.querySelector('[name="imp_ieps"]')?.checked;
+  return { iva, isr, ieps };
+}
+
+function useIVA() {
+  return !!document.querySelector('[name="imp_iva"]')?.checked;
+}
+function useISR() {
+  return !!document.querySelector('[name="imp_isr"]')?.checked;
+}
+function useIEPS() {
+  return !!document.querySelector('[name="imp_ieps"]')?.checked;
+}
 
   function getIsrPercent() {
     const el = document.querySelector('[name="isr_tasa"]');
@@ -540,28 +876,32 @@
   }
 
   function refreshTotales() {
-    const detalle = buildDetalle();
-    const subtotal = calcSubtotal(detalle);
+  const detalle = buildDetalle();
+  const subtotal = calcSubtotal(detalle);
 
-    const tipo = getImpuestoTipo();
-    let iva = 0;
-    let isr = 0;
-    let ieps = 0;
+  let iva = 0;
+  let isr = 0;
+  let ieps = 0;
 
-    if (tipo === "IVA") iva = subtotal * 0.16;
-    else if (tipo === "ISR") isr = subtotal * getIsrRate();
-    else if (tipo === "IEPS") ieps = subtotal * getIepsRate();
+  // ✅ IVA fijo 16%
+  if (useIVA()) iva = subtotal * 0.16;
 
-    const total = subtotal + iva + isr + ieps;
+  // ✅ ISR e IEPS editables
+  if (useISR()) isr = subtotal * getIsrRate();
+  if (useIEPS()) ieps = subtotal * getIepsRate();
 
-    setVal("subtotal", subtotal.toFixed(2));
-    setVal("iva", iva.toFixed(2));
-    setVal("isr", isr.toFixed(2));
-    setVal("ieps", ieps.toFixed(2));
-    setVal("total", total.toFixed(2));
-    setVal("cantidad_pago", total.toFixed(2));
-    setVal("cantidad_con_letra", numeroALetrasMX(total));
-  }
+  const total = subtotal + iva + isr + ieps;
+
+  setVal("subtotal", subtotal.toFixed(2));
+  setVal("iva", iva.toFixed(2));
+  setVal("isr", isr.toFixed(2));
+  setVal("ieps", ieps.toFixed(2));
+  setVal("total", total.toFixed(2));
+  setVal("cantidad_pago", total.toFixed(2));
+  setVal("cantidad_con_letra", numeroALetrasMX(total));
+}
+
+
 
   document.addEventListener("input", (e) => {
     if (e.target && e.target.classList.contains("sp-importe")) {
@@ -609,54 +949,10 @@
     if (num === 0) return "CERO";
     if (num < 0) return "MENOS " + numeroALetras(Math.abs(num));
 
-    const unidades = [
-      "",
-      "UNO",
-      "DOS",
-      "TRES",
-      "CUATRO",
-      "CINCO",
-      "SEIS",
-      "SIETE",
-      "OCHO",
-      "NUEVE",
-    ];
-    const decenas10 = [
-      "DIEZ",
-      "ONCE",
-      "DOCE",
-      "TRECE",
-      "CATORCE",
-      "QUINCE",
-      "DIECISÉIS",
-      "DIECISIETE",
-      "DIECIOCHO",
-      "DIECINUEVE",
-    ];
-    const decenas = [
-      "",
-      "",
-      "VEINTE",
-      "TREINTA",
-      "CUARENTA",
-      "CINCUENTA",
-      "SESENTA",
-      "SETENTA",
-      "OCHENTA",
-      "NOVENTA",
-    ];
-    const centenas = [
-      "",
-      "CIENTO",
-      "DOSCIENTOS",
-      "TRESCIENTOS",
-      "CUATROCIENTOS",
-      "QUINIENTOS",
-      "SEISCIENTOS",
-      "SETECIENTOS",
-      "OCHOCIENTOS",
-      "NOVECIENTOS",
-    ];
+    const unidades = ["", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"];
+    const decenas10 = ["DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE", "DIECISÉIS", "DIECISIETE", "DIECIOCHO", "DIECINUEVE"];
+    const decenas = ["", "", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"];
+    const centenas = ["", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"];
 
     function seccion(n) {
       if (n === 0) return "";
@@ -670,10 +966,7 @@
 
       if (c) out += centenas[c] + " ";
       if (du >= 10 && du <= 19) return (out + decenas10[du - 10]).trim();
-      if (d === 2 && u !== 0)
-        return (out + ("VEINTI" + unidades[u].toLowerCase()))
-          .toUpperCase()
-          .trim();
+      if (d === 2 && u !== 0) return (out + ("VEINTI" + unidades[u].toLowerCase())).toUpperCase().trim();
 
       if (d) {
         out += decenas[d];
@@ -712,47 +1005,50 @@
   // Impuestos: eventos y reglas
   // ---------------------------
   function bindTaxEvents() {
-    const radios = document.querySelectorAll('input[name="impuesto_tipo"]');
-    const isrInput = document.querySelector('[name="isr_tasa"]');
-    const iepsInput = document.querySelector('[name="ieps_tasa"]');
+  const chkIVA  = document.querySelector('[name="imp_iva"]');
+  const chkISR  = document.querySelector('[name="imp_isr"]');
+  const chkIEPS = document.querySelector('[name="imp_ieps"]');
 
-    radios.forEach((r) => {
-      r.addEventListener("change", () => {
-        const tipo = getImpuestoTipo();
-        if (isrInput) {
-          isrInput.disabled = tipo !== "ISR";
-          if (tipo === "ISR" && !isrInput.value) isrInput.value = "10";
-        }
-         if (iepsInput) {
-          iepsInput.disabled = tipo !== "IEPS";
-          if (tipo === "IEPS" && !iepsInput.value) iepsInput.value = "8";
-        }
-        refreshTotales();
-      });
-    });
+  const isrInput  = document.querySelector('[name="isr_tasa"]');
+  const iepsInput = document.querySelector('[name="ieps_tasa"]');
 
-    isrInput?.addEventListener("input", refreshTotales);
-    iepsInput?.addEventListener("input", refreshTotales);
-    if (isrInput) isrInput.disabled = getImpuestoTipo() !== "ISR";
-    if (iepsInput) iepsInput.disabled = getImpuestoTipo() !== "IEPS";
-  }
+  const sync = () => {
+    // IVA no tiene input, solo recalcula
+    if (isrInput) {
+      isrInput.disabled = !chkISR?.checked;
+      if (chkISR?.checked && !isrInput.value) isrInput.value = "10";
+    }
+    if (iepsInput) {
+      iepsInput.disabled = !chkIEPS?.checked;
+      if (chkIEPS?.checked && !iepsInput.value) iepsInput.value = "8";
+    }
+    refreshTotales();
+  };
+
+  chkIVA?.addEventListener("change", sync);
+  chkISR?.addEventListener("change", sync);
+  chkIEPS?.addEventListener("change", sync);
+
+  isrInput?.addEventListener("input", refreshTotales);
+  iepsInput?.addEventListener("input", refreshTotales);
+
+  sync();
+}
+
+
 
   // =====================================================================
-  // ✅ NUEVO: Construir payload COMPLETO desde el FORM (para comprometido)
+  // ✅ Construir payload COMPLETO desde el FORM (para comprometido)
   // =====================================================================
   function buildSufPayloadFromForm(saved) {
-    const getL = (name) =>
-      document.querySelector(`[name="${name}"]`)?.value ?? "";
+    const getL = (name) => document.querySelector(`[name="${name}"]`)?.value ?? "";
 
     const getNum = (name) => {
       const x = Number(getL(name));
       return Number.isFinite(x) ? x : 0;
     };
 
-    // Detalle REAL (tu fila: No, clave, concepto, justificacion, descripcion, importe)
-    const detalle = Array.from(
-      document.querySelectorAll("#detalleBody tr")
-    ).map((tr) => {
+    const detalle = Array.from(document.querySelectorAll("#detalleBody tr")).map((tr) => {
       const inputs = tr.querySelectorAll("input");
 
       const clave = inputs[1]?.value ?? "";
@@ -764,14 +1060,11 @@
       return { clave, concepto_partida, justificacion, descripcion, importe };
     });
 
-    const imp =
-      document.querySelector('input[name="impuesto_tipo"]:checked')?.value ||
-      "NONE";
+    const imp = document.querySelector('input[name="impuesto_tipo"]:checked')?.value || "NONE";
 
     return {
       id: saved?.id ?? saved?.id_suficiencia ?? null,
-      folio_num:
-        saved?.folio_num ?? saved?.no_suficiencia ?? saved?.folio ?? null,
+      folio_num: saved?.folio_num ?? saved?.no_suficiencia ?? saved?.folio ?? null,
 
       fecha: getL("fecha"),
       dependencia: getL("dependencia"),
@@ -787,7 +1080,10 @@
       mes_pago: getL("mes_pago"),
       cantidad_pago: getNum("cantidad_pago"),
 
+      // ✅ Opción A
+      id_meta: getL("id_meta"),
       meta: getL("meta"),
+
       subtotal: getNum("subtotal"),
       iva: getNum("iva"),
       isr: getNum("isr"),
@@ -823,15 +1119,14 @@
     const id_usuario = user?.id != null ? Number(user.id) : null;
 
     const id_proyecto = get("id_proyecto") ? Number(get("id_proyecto")) : null;
-
-    // en tu HTML el select se llama name="fuente" (value = id)
     const id_fuente = get("fuente") ? Number(get("fuente")) : null;
 
-    // texto visible del combo (ej "150101 - Recurso Estatal")
     const fuenteText =
-      document
-        .querySelector('[name="fuente"]')
-        ?.selectedOptions?.[0]?.textContent?.trim() || "";
+      document.querySelector('[name="fuente"]')?.selectedOptions?.[0]?.textContent?.trim() || "";
+
+    // ✅ Opción A: id_meta + meta
+    const id_meta = get("id_meta") ? Number(get("id_meta")) : null;
+    const meta = get("meta") || null;
 
     return {
       id_usuario,
@@ -841,6 +1136,10 @@
       id_proyecto,
       id_fuente,
 
+      // ✅ agrega id_meta al backend
+      id_meta,
+      meta,
+
       no_suficiencia: null,
       fecha: get("fecha") || null,
       dependencia: get("dependencia") || null,
@@ -848,7 +1147,6 @@
 
       clave_programatica: get("clave_programatica") || null,
 
-      meta: get("meta") || null,
       impuesto_tipo: getImpuestoTipo(),
       isr_tasa: get("isr_tasa") || null,
       ieps_tasa: get("ieps_tasa") || null,
@@ -856,10 +1154,8 @@
       iva: safeNumber(get("iva")),
       isr: safeNumber(get("isr")),
       ieps: safeNumber(get("ieps")),
-
       total: safeNumber(get("total")),
       cantidad_con_letra: get("cantidad_con_letra") || "",
-
       fuente: fuenteText,
 
       detalle: buildDetalle(),
@@ -869,14 +1165,10 @@
   async function save() {
     refreshTotales();
 
-    // ✅ payload para backend
     const payloadBackend = buildPayload();
 
-    // ✅ VALIDACIONES FRONT
     if (!payloadBackend.id_usuario) {
-      throw new Error(
-        "No se detectó el usuario logueado (cp_usuario). Vuelve a iniciar sesión."
-      );
+      throw new Error("No se detectó el usuario logueado (cp_usuario). Vuelve a iniciar sesión.");
     }
     if (!payloadBackend.id_proyecto) {
       throw new Error("Selecciona un PROYECTO antes de guardar.");
@@ -884,8 +1176,9 @@
     if (!payloadBackend.id_fuente) {
       throw new Error("Selecciona una FUENTE antes de guardar.");
     }
+    // (opcional) si quieres obligar meta:
+    // if (!payloadBackend.id_meta) throw new Error("Selecciona una META antes de guardar.");
 
-    // ✅ POST
     const saved = await fetchJson(`${API}/api/suficiencias`, {
       method: "POST",
       headers: {
@@ -895,24 +1188,16 @@
       body: JSON.stringify(payloadBackend),
     });
 
-    console.log("[SP] respuesta POST /api/suficiencias:", saved);
-
-    if (!saved?.id) {
-      console.error("[SP] Respuesta sin id:", saved);
-      throw new Error("El servidor no devolvió el ID del registro.");
-    }
+    if (!saved?.id) throw new Error("El servidor no devolvió el ID del registro.");
 
     lastSavedId = saved.id;
 
-    // ✅ Folio visual
     if (saved?.no_suficiencia) {
-      setVal("no_suficiencia", String(saved.no_suficiencia).padStart(6, "0"));
+      setVal("no_suficiencia", String(saved.no_suficiencia));
     } else if (saved?.folio_num != null) {
       setVal("no_suficiencia", String(saved.folio_num).padStart(6, "0"));
     }
 
-    // ✅ AHORA SÍ: guardar en localStorage el payload COMPLETO (tal cual el form)
-    // (esto es lo que consumirá comprometido.js)
     try {
       const payloadCompleto = buildSufPayloadFromForm(saved);
       saveCpLastSuf(payloadCompleto);
@@ -920,7 +1205,6 @@
       console.warn("[SP] No se pudo guardar cp_last_suficiencia completo:", e);
     }
 
-    // ✅ Habilita comprometido
     if (btnVerComprometido) {
       btnVerComprometido.disabled = false;
       btnVerComprometido.dataset.id = String(lastSavedId);
@@ -937,7 +1221,7 @@
   }
 
   // ---------------------------
-  // VER COMPROMETIDO
+  // VER COMPROMETIDO / DEVENGADO
   // ---------------------------
   function readLastIdFromLocalStorage() {
     try {
@@ -963,10 +1247,7 @@
   // ---------------------------
   async function fetchPdfTemplateBytesSuf() {
     const r = await fetch(SUF_PDF_TEMPLATE_URL);
-    if (!r.ok)
-      throw new Error(
-        `No se pudo cargar la plantilla PDF: ${SUF_PDF_TEMPLATE_URL}`
-      );
+    if (!r.ok) throw new Error(`No se pudo cargar la plantilla PDF: ${SUF_PDF_TEMPLATE_URL}`);
     return await r.arrayBuffer();
   }
 
@@ -974,33 +1255,34 @@
     const bytes = await fetchPdfTemplateBytesSuf();
     const pdfDoc = await PDFLib.PDFDocument.load(bytes);
     const form = pdfDoc.getForm();
-    console.log(
-      "[PDF] Campos:",
-      form.getFields().map((f) => f.getName())
-    );
+    console.log("[PDF] Campos:", form.getFields().map((f) => f.getName()));
   }
 
   async function generarPDF() {
     refreshTotales();
 
     if (!window.PDFLib?.PDFDocument) {
-      throw new Error(
-        "Falta pdf-lib. Revisa que el script de pdf-lib cargue antes."
-      );
+      throw new Error("Falta pdf-lib. Revisa que el script de pdf-lib cargue antes.");
     }
+
+    const fuenteSel = document.querySelector('[name="fuente"]');
+    const fuenteText = fuenteSel?.selectedOptions?.[0]?.textContent || "";
 
     const payload = {
       fecha: get("fecha"),
       dependencia: get("dependencia"),
-      fuente: get("fuente"),
+      fuente_texto: fuenteText,
       mes_pago: get("mes_pago"),
       subtotal: get("subtotal"),
       iva: get("iva"),
       isr: get("isr"),
-      eps: get("ieps"),
+      ieps: get("ieps"),
       total: get("total"),
       cantidad_con_letra: get("cantidad_con_letra"),
+
+      // ✅ Opción A: PDF usa el TEXTO
       meta: get("meta"),
+
       clave_programatica: get("clave_programatica"),
       detalle: buildDetalle(),
       folio_num: get("no_suficiencia"),
@@ -1023,28 +1305,18 @@
     };
 
     function splitFechaParts(iso) {
-      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso))
-        return { d: "", m: "", y: "" };
+      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return { d: "", m: "", y: "" };
       const [y, m, d] = iso.split("-");
       return { d, m, y };
     }
 
     // CABECERA
     setTextSafe("NOMBRE DE LA DEPENDENCIA GENERAL:", payload.dependencia || "");
-    setTextSafe(
-      "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
-      payload.clave_programatica || ""
-    );
-    setTextSafe(
-      "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
-      payload.clave_programatica || ""
-    );
+    setTextSafe("CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
+    setTextSafe("NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
 
-    const fuenteSel = document.querySelector('[name="fuente"]');
-    const fuenteText = fuenteSel?.selectedOptions?.[0]?.textContent || "";
-
-    setTextSafe("FUENTE DE FINANCIAMIENTO", String(payload.fuente || ""));
-    setTextSafe("NOMBRE F.F", String(fuenteText || ""));
+    setTextSafe("FUENTE DE FINANCIAMIENTO", String(payload.fuente_texto || ""));
+    setTextSafe("NOMBRE F.F", String(payload.fuente_texto || ""));
 
     const { d, m, y } = splitFechaParts(payload.fecha);
     setTextSafe("fechadia", d);
@@ -1052,24 +1324,9 @@
     setTextSafe("fechayear", y);
 
     // PROGRAMACIÓN DE PAGO
-    const mesSel = String(payload.mes_pago || "")
-      .trim()
-      .toUpperCase();
+    const mesSel = String(payload.mes_pago || "").trim().toUpperCase();
     const totalTxt = safeN(payload.total).toFixed(2);
-    const meses = [
-      "ENERO",
-      "FEBRERO",
-      "MARZO",
-      "ABRIL",
-      "MAYO",
-      "JUNIO",
-      "JULIO",
-      "AGOSTO",
-      "SEPTIEMBRE",
-      "OCTUBRE",
-      "NOVIEMBRE",
-      "DICIEMBRE",
-    ];
+    const meses = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
     for (const mes of meses) {
       setTextSafe(`${mes}PROGRAMACIÓN DE PAGO`, mes === mesSel ? totalTxt : "");
     }
@@ -1078,22 +1335,10 @@
     const detalle = payload.detalle || [];
     setTextSafe("No", detalle.map((r) => r.renglon).join("\n"));
     setTextSafe("CLAVE", detalle.map((r) => r.clave || "").join("\n"));
-    setTextSafe(
-      "CONCEPTO DE PARTIDA",
-      detalle.map((r) => r.concepto_partida || "").join("\n")
-    );
-    setTextSafe(
-      "JUSTIFICACIÓN",
-      detalle.map((r) => r.justificacion || "").join("\n")
-    );
-    setTextSafe(
-      "DESCRIPCIÓN",
-      detalle.map((r) => r.descripcion || "").join("\n")
-    );
-    setTextSafe(
-      "IMPORTE",
-      detalle.map((r) => safeN(r.importe).toFixed(2)).join("\n")
-    );
+    setTextSafe("CONCEPTO DE PARTIDA", detalle.map((r) => r.concepto_partida || "").join("\n"));
+    setTextSafe("JUSTIFICACIÓN", detalle.map((r) => r.justificacion || "").join("\n"));
+    setTextSafe("DESCRIPCIÓN", detalle.map((r) => r.descripcion || "").join("\n"));
+    setTextSafe("IMPORTE", detalle.map((r) => safeN(r.importe).toFixed(2)).join("\n"));
 
     // TOTALES
     setTextSafe("subtotal", safeN(payload.subtotal).toFixed(2));
@@ -1165,54 +1410,46 @@
     btnVerComprometido?.addEventListener("click", (e) => {
       e.preventDefault();
 
-      let id = btnVerComprometido.dataset.id
-        ? Number(btnVerComprometido.dataset.id)
-        : null;
+      let id = btnVerComprometido.dataset.id ? Number(btnVerComprometido.dataset.id) : null;
       if (!id && lastSavedId) id = Number(lastSavedId);
       if (!id) id = readLastIdFromLocalStorage();
 
-      if (!id) {
-        alert("Primero guarda la Suficiencia para generar el Comprometido.");
-        return;
-      }
-
-      // ✅ ya tienes el payload completo guardado por save()
+      if (!id) return alert("Primero guarda la Suficiencia para generar el Comprometido.");
       goComprometido(id);
     });
 
     btnVerDevengado?.addEventListener("click", (e) => {
-  e.preventDefault();
+      e.preventDefault();
 
-  let id = btnVerDevengado.dataset.id
-    ? Number(btnVerDevengado.dataset.id)
-    : null;
+      let id = btnVerDevengado.dataset.id ? Number(btnVerDevengado.dataset.id) : null;
+      if (!id && lastSavedId) id = Number(lastSavedId);
+      if (!id) id = readLastIdFromLocalStorage();
 
-  if (!id && lastSavedId) id = Number(lastSavedId);
-  if (!id) id = readLastIdFromLocalStorage();
+      if (!id) return alert("Primero guarda la Suficiencia para generar el Devengado.");
+      goDevengado(id);
+    });
 
-  if (!id) {
-    alert("Primero guarda la Suficiencia para generar el Devengado.");
-    return;
-  }
+    // ✅ cuando cambie proyecto, actualiza clave + metas
+    document.querySelector('[name="id_proyecto"]')?.addEventListener("change", async () => {
+      updateClaveProgramatica();
 
-  goDevengado(id);
-});
+      // resetea meta antes de recargar
+      setVal("id_meta", "");
+      setVal("meta", "");
 
-    document
-      .querySelector('[name="id_proyecto"]')
-      ?.addEventListener("change", updateClaveProgramatica);
+      await loadMetasForCurrentSelection();
+    });
+
+    // ✅ Opción A: id_meta -> meta hidden
+    bindMetaToHidden();
 
     bindTaxEvents();
 
     if (DEBUG_PDF_FIELDS) {
-      debugListPdfFields().catch((err) =>
-        console.warn("[PDF debug] ", err.message)
-      );
+      debugListPdfFields().catch((err) => console.warn("[PDF debug] ", err.message));
     }
 
-    // ---------------------------
-    // ✅ Eventos BUSCADOR
-    // ---------------------------
+    // ✅ BUSCADOR
     btnToggleBuscar?.addEventListener("click", () => {
       if (!panelBuscar) return;
       const isShown = panelBuscarEl.classList.contains("show");
@@ -1226,8 +1463,7 @@
     btnBuscarNumero?.addEventListener("click", async () => {
       try {
         const n = txtNumeroSuf?.value || "";
-        if (!String(n).trim())
-          return alert("Escribe el número de suficiencia.");
+        if (!String(n).trim()) return alert("Escribe el número de suficiencia.");
         await buscarPorNumero(n);
       } catch (err) {
         console.error("[BUSCAR] error:", err);
@@ -1236,10 +1472,7 @@
     });
 
     btnBuscarClaves?.addEventListener("click", async () => {
-      alert(
-        "Búsqueda por Dep + Programática: pendiente (aún no está implementada en el backend). Usa búsqueda por número."
-      );
-      // Cuando lo tengas en backend, cambias a:
+      alert("Búsqueda por Dep + Programática: pendiente (aún no está implementada en el backend). Usa búsqueda por número.");
       // await buscarPorClaves(txtDepClave.value, txtProgClave.value);
     });
 
@@ -1267,28 +1500,18 @@
     initRows();
     bindEvents();
 
-    try {
-      await loadPartidasCatalog();
-    } catch (e) {
-      console.warn("[SP] catálogo partidas:", e.message);
-    }
+    try { await loadPartidasCatalog(); } catch (e) { console.warn("[SP] catálogo partidas:", e.message); }
+    try { await loadDependenciasFromUser(); } catch (e) { console.warn("[SP] dependencias:", e.message); }
 
-    try {
-      await loadDependenciasFromUser();
-    } catch (e) {
-      console.warn("[SP] dependencias:", e.message);
-    }
+    // ✅ cargar proyectos y aplicar candado
     try {
       await loadProyectosCatalog();
+      applyProyectoFilters();
     } catch (e) {
       console.warn("[SP] proyectos:", e.message);
     }
-    try {
-      await loadFuentesCatalog();
-      bindFuenteToHidden(); // ✅ importante para id_fuente
-    } catch (e) {
-      console.warn("[SP] fuentes:", e.message);
-    }
+
+    try { await loadFuentesCatalog(); bindFuenteToHidden(); } catch (e) { console.warn("[SP] fuentes:", e.message); }
 
     try {
       const lastId = readLastIdFromLocalStorage();
@@ -1298,14 +1521,15 @@
         btnVerComprometido.classList.remove("disabled");
       }
       if (btnVerDevengado && lastId) {
-  btnVerDevengado.disabled = false;
-  btnVerDevengado.dataset.id = String(lastId);
-  btnVerDevengado.classList.remove("disabled");
-}
+        btnVerDevengado.disabled = false;
+        btnVerDevengado.dataset.id = String(lastId);
+        btnVerDevengado.classList.remove("disabled");
+      }
     } catch {}
 
     refreshTotales();
     updateClaveProgramatica();
+    await loadMetasForCurrentSelection();
   }
 
   if (document.readyState === "loading") {
@@ -1313,4 +1537,4 @@
   } else {
     init();
   }
-})();
+})());

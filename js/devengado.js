@@ -7,6 +7,7 @@
   const btnDescargarPdf = document.getElementById("btn-descargar-pdf");
   const btnRecargar = document.getElementById("btn-recargar");
   const detalleBody = document.getElementById("detalleBody");
+  const tipoDocumento = "DV";
 
   // ---------------------------
   // AUTH
@@ -349,7 +350,7 @@ console.log("[COMPROMETIDO] detalle length:", payload.detalle?.length);
 
   // Folio
   const folioDevengado = buildFolioNumber(
-    "DV",
+    tipoDocumento,
     payload.fecha,
     payload.id || getQueryId()
   );

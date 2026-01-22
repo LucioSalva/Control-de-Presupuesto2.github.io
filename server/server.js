@@ -19,6 +19,7 @@ import suficienciasRouter from "./routes/suficiencias.routes.js";
 import presupuestoRouter from "./routes/presupuesto.routes.js";
 import comprometidoRouter from "./routes/comprometido.routes.js";
 import devengadoRouter from "./routes/devengado.routes.js";
+import metasRouter from "./routes/metas.routes.js";
 
 dotenv.config();
 
@@ -165,6 +166,8 @@ app.use("/api/catalogos/partidas", authRequired, blockPartidasWrite);
 
 // ✅ Catálogos (si quieres que solo logueados los vean)
 app.use("/api/catalogos", authRequired, catalogosRoutes);
+
+app.use("/api/catalogos/metas", authRequired, metasRouter);
 
 // =====================================================
 //  HEALTH

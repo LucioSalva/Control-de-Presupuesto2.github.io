@@ -7,6 +7,9 @@
   const btnDescargarPdf = document.getElementById("btn-descargar-pdf");
   const btnRecargar = document.getElementById("btn-recargar");
   const detalleBody = document.getElementById("detalleBody");
+  const tipoDocumento = window.location.pathname.includes("devengado")
+    ? "DV"
+    : "CP";
 
   // ---------------------------
   // AUTH
@@ -86,6 +89,16 @@
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
     if (s.includes("T")) return s.split("T")[0];
     return s;
+  }
+
+  function formatFolio(raw) {
+    const str = String(raw ?? "").trim();
+    if (!str) return "";
+    if (str.includes("-")) {
+      return str.replace(/-(SP|CP|DV)-/, `-${tipoDocumento}-`);
+    }
+    if (/^\d+$/.test(str)) return str.padStart(6, "0");
+    return str;
   }
 
   function getMonthCode(dateStr) {
@@ -352,12 +365,11 @@
     console.log("[COMPROMETIDO] detalle length:", payload.detalle?.length);
 
     // Folio
-    const folioComprometido = buildFolioNumber(
-      "CP",
-      payload.fecha,
-      payload.id || getQueryId()
-    );
-    setVal("no_suficiencia", folioComprometido);
+  setVal(
+    "no_suficiencia",
+    payload.folio_num != null ? formatFolio(payload.folio_num) : ""
+  );
+
     // Generales
     setVal("fecha", payload.fecha);
     setVal("dependencia", payload.dependencia);
