@@ -202,38 +202,42 @@ router.post("/", async (req, res) => {
 });
 
 /* =====================================================
-   GET /api/suficiencias/buscar?numero=000001
-   - Si es numérico => folio_num
-   - Si no => no_suficiencia ILIKE
-   - AREA => filtra por DG/DA del usuario
+   GET /api/suficiencias/buscar?numero=...
+   Soporta:
+   - 000123  -> folio_num
+   - ECA-01-SP-0001 -> no_suficiencia (tu formato con guiones)
+   - ECA/2026/01/SP/004 -> folio_oficial_suficiencia (tu formato oficial con /)
+   AREA => filtra por DG/DA del usuario
    ===================================================== */
 router.get("/buscar", async (req, res) => {
   try {
     const role = getRole(req);
+
     const numeroRaw = String(req.query.numero || "").trim();
-
-    if (!numeroRaw) {
-      return res.status(400).json({ error: "Falta parametro numero" });
-    }
-
-    const numero = pad6(numeroRaw);
+    if (!numeroRaw) return res.status(400).json({ error: "Falta parametro numero" });
 
     const where = [];
     const params = [];
     let i = 1;
 
-    // criterio
-    if (/^\d+$/.test(numero)) {
-      const folio = Number(numero);
-      where.push(`folio_num = $${i++}`);
-      params.push(folio);
+    // ✅ 1) Si viene el folio oficial con slashes: ECA/2026/01/SP/004
+    const isFolioOficial = /^ECA\/\d{4}\/\d{2}\/SP\/\d{1,6}$/i.test(numeroRaw);
+    if (isFolioOficial) {
+      where.push(`folio_oficial_suficiencia = $${i++}`);
+      params.push(numeroRaw);
     } else {
-      // texto (ej: ECA-01-SP-0001)
-      where.push(`no_suficiencia ILIKE $${i++}`);
-      params.push(`%${numero}%`);
+      // ✅ 2) Si viene SOLO número => folio_num
+      if (/^\d{1,6}$/.test(numeroRaw)) {
+        where.push(`folio_num = $${i++}`);
+        params.push(Number(numeroRaw));
+      } else {
+        // ✅ 3) cualquier otro texto => busca en no_suficiencia
+        where.push(`no_suficiencia ILIKE $${i++}`);
+        params.push(`%${numeroRaw}%`);
+      }
     }
 
-    // seguridad para AREA
+    // ✅ Candado AREA (DG/DA)
     if (role === "AREA") {
       if (req.user?.id_dgeneral != null) {
         where.push(`id_dgeneral = $${i++}`);
@@ -246,7 +250,7 @@ router.get("/buscar", async (req, res) => {
     }
 
     const sql = `
-      SELECT id, folio_num, no_suficiencia, fecha, id_dgeneral, id_dauxiliar
+      SELECT id, folio_num, no_suficiencia, folio_oficial_suficiencia, fecha, id_dgeneral, id_dauxiliar
       FROM suficiencias
       WHERE ${where.join(" AND ")}
       ORDER BY id DESC
@@ -260,6 +264,7 @@ router.get("/buscar", async (req, res) => {
     return res.status(500).json({ error: "Error al buscar", db: err.message });
   }
 });
+
 
 /* =====================================================
    ✅ GET /api/suficiencias/:id

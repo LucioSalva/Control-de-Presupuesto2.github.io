@@ -302,8 +302,8 @@
 
       cantidad_con_letra: payload.cantidad_con_letra ?? "",
       impuesto_tipo: payload.impuesto_tipo ?? "NONE",
-      isr_tasa: payload.isr_tasa ?? "",
-      ieps_tasa: payload.ieps_tasa ?? "",
+      isr_tasa: payload.isr_tasa ?? null,
+      ieps_tasa: payload.ieps_tasa ?? null,
 
       detalle: Array.isArray(payload.detalle) ? payload.detalle : [],
     };
@@ -462,6 +462,36 @@
       const id = String(input?.value || "").trim();
       if (!id) return;
       window.location.href = `comprometido.html?id=${encodeURIComponent(id)}`;
+    });
+
+    const btnGuardar = document.getElementById("btn-guardar");
+
+    btnGuardar?.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        if (!state.payload?.id) {
+          alert("No hay ID de suficiencia para guardar.");
+          return;
+        }
+
+        const body = {
+          id_suficiencia: state.payload.id,
+          ...state.payload,
+        };
+
+        const r = await fetchJson(`${API}/api/comprometido`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify(body),
+        });
+
+        alert(
+          `Comprometido guardado: ${r.no_comprometido} (folio ${r.folio_num})`,
+        );
+      } catch (err) {
+        console.error("[COMPROMETIDO] save error:", err);
+        alert(err?.message || "Error al guardar comprometido");
+      }
     });
 
     const btnVerDevengado = document.getElementById("btn-ver-devengado");

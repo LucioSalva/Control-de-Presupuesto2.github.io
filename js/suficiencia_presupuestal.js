@@ -126,6 +126,42 @@
   // ---------------------------
   // ✅ Helpers BUSCADOR
   // ---------------------------
+  // ============================
+  // ✅ Folio formato: ECA/2026/01/SP/000001
+  // ============================
+  function normalizeFolioInput(input) {
+    const raw = String(input || "").trim();
+    if (!raw) return "";
+
+    // si ya viene con formato ECA/.../SP/xxxxxx
+    const m = raw.match(/ECA\/\d{4}\/\d{2}\/SP\/(\d{1,6})/i);
+    if (m) {
+      const num = String(m[1]).padStart(6, "0");
+      return `ECA/2026/01/SP/${num}`; // ✅ tu formato fijo que pediste
+    }
+
+    // si viene solo número
+    if (/^\d{1,6}$/.test(raw)) {
+      const num = raw.padStart(6, "0");
+      return `ECA/2026/01/SP/${num}`;
+    }
+
+    // si viene algo raro, intenta extraer últimos dígitos
+    const onlyDigits = raw.replace(/\D/g, "");
+    if (onlyDigits && onlyDigits.length <= 6) {
+      const num = onlyDigits.padStart(6, "0");
+      return `ECA/2026/01/SP/${num}`;
+    }
+
+    return ""; // inválido
+  }
+
+  function folioToNumero6(folio) {
+    // ECA/2026/01/SP/000123 -> 000123
+    const m = String(folio || "").match(/\/(\d{6})$/);
+    return m ? m[1] : "";
+  }
+
   function pad6(value) {
     const v = String(value || "").trim();
     if (!v) return "";
@@ -133,12 +169,18 @@
     return v;
   }
 
-  async function buscarPorNumero(numero) {
-    const num = pad6(numero);
-    const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(num)}`;
-    const json = await fetchJson(url, { headers: { ...authHeaders() } });
-    renderResultadosBusqueda(json?.data || []);
-  }
+ async function buscarPorNumero(numero) {
+  const raw = String(numero || "").trim();
+  if (!raw) return;
+
+  // si viene folio oficial, mándalo tal cual
+  const isFolioOficial = /^ECA\/\d{4}\/\d{2}\/SP\/\d{1,6}$/i.test(raw);
+  const q = isFolioOficial ? raw : pad6(raw);
+
+  const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(q)}`;
+  const json = await fetchJson(url, { headers: { ...authHeaders() } });
+  renderResultadosBusqueda(json?.data || []);
+}
 
   async function buscarPorClaves(dep, prog) {
     const d = String(dep || "").trim();
@@ -150,7 +192,7 @@
   }
 
   // ===========================
-  // ✅ Cargar suficiencia al formulario
+  // Cargar suficiencia al formulario
   // ===========================
   async function cargarSuficienciaEnFormulario(id) {
     const data = await fetchJson(`${API}/api/suficiencias/${id}`, {
@@ -178,9 +220,12 @@
 
     // --- Cabecera ---
     setVal(
-      "no_suficiencia",
-      data.no_suficiencia || String(data.folio_num || "").padStart(6, "0"),
-    );
+  "no_suficiencia",
+  data.folio_oficial_suficiencia ||
+    data.no_suficiencia ||
+    String(data.folio_num || "").padStart(6, "0"),
+);
+
     setVal("fecha", data.fecha ? String(data.fecha).split("T")[0] : "");
     setVal("dependencia", data.dependencia || "");
     setVal("dependencia_aux", data.departamento || data.dependencia_aux || "");
@@ -305,22 +350,22 @@
       return;
     }
 
+    // ✅ si viene 1 sola, cargamos directo sin prompt
     if (rows.length === 1) {
-      const r = rows[0];
-      const folio =
-        r.no_suficiencia || String(r.folio_num || "").padStart(6, "0");
-      if (confirm(`¿Cargar suficiencia ${folio}?`)) {
-        cargarSuficienciaEnFormulario(r.id);
-      }
+      cargarSuficienciaEnFormulario(rows[0].id);
       return;
     }
 
+    // ✅ si vienen varias, elegimos
     const opciones = rows
       .map((r, i) => {
-        const folio =
-          r.no_suficiencia || String(r.folio_num || "").padStart(6, "0");
+        const folioNum = String(r.folio_num ?? r.no_suficiencia ?? "").padStart(
+          6,
+          "0",
+        );
+        const folio = `ECA/2026/01/SP/${folioNum}`;
         const fecha = r.fecha ? String(r.fecha).split("T")[0] : "";
-        return `${i + 1}. Folio: ${folio} - Fecha: ${fecha}`;
+        return `${i + 1}. ${folio} - ${fecha}`;
       })
       .join("\n");
 
@@ -1453,12 +1498,11 @@
       total: get("total"),
       cantidad_con_letra: get("cantidad_con_letra"),
 
-      // ✅ meta = nombre del proyecto
       meta: get("meta"),
 
       clave_programatica: get("clave_programatica"),
       detalle: buildDetalle(),
-      folio_num: get("no_suficiencia"),
+      folio_oficial_suficiencia: get("no_suficiencia") || "",
     };
 
     const templateBytes = await fetchPdfTemplateBytesSuf();
@@ -1678,7 +1722,9 @@
       try {
         const n = txtNumeroSuf?.value || "";
         if (!String(n).trim())
-          return alert("Escribe el número de suficiencia.");
+          return alert(
+            "Escribe el folio ECA/2026/01/SP/000001 o el número 000001.",
+          );
         await buscarPorNumero(n);
       } catch (err) {
         console.error("[BUSCAR] error:", err);

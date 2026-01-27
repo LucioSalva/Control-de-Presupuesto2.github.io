@@ -6,12 +6,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-
-// ✅ DB (ajusta si tu db.js no está aquí)
-import { query } from "./db.js"; // <-- si db.js está junto a server.js
-// import { query } from "../db.js"; // <-- si db.js está un nivel arriba
-
-// Routers
+import { query } from "./db.js";
 import catalogosRoutes from "./routes/catalogos.routes.js";
 import adminUsuariosRouter from "./routes/admin-usuarios.routes.js";
 import authRouter from "./routes/auth.routes.js";
@@ -20,32 +15,21 @@ import presupuestoRouter from "./routes/presupuesto.routes.js";
 import comprometidoRouter from "./routes/comprometido.routes.js";
 import devengadoRouter from "./routes/devengado.routes.js";
 import metasRouter from "./routes/metas.routes.js";
-
 dotenv.config();
-
 const app = express();
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 // =====================================================
 //  MIDDLEWARE BASE
 // =====================================================
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
-
 // =====================================================
 //  STATIC (FRONTEND)
 // =====================================================
-app.use(express.static(path.join(__dirname, "public"))); // server/public (si lo usas)
-
-// ✅ Sirve la carpeta public de la RAÍZ del proyecto (la de tu imagen)
+app.use(express.static(path.join(__dirname, "public")));
 app.use("/public", express.static(path.join(__dirname, "..", "public")));
-
-// ✅ Opcional: si quieres que /PDF/... funcione directo
 app.use("/PDF", express.static(path.join(__dirname, "..", "public", "PDF")));
-
-// tus folders de raíz ya los estás sirviendo así:
 app.use("/css", express.static(path.join(__dirname, "..", "css")));
 app.use("/js", express.static(path.join(__dirname, "..", "js")));
 
@@ -143,34 +127,20 @@ function blockPartidasWrite(req, res, next) {
 //  ROUTERS API
 // =====================================================
 
-// Auth (login)
 app.use("/api", authRouter);
-
-// Admin usuarios
 app.use("/api/admin/usuarios", adminUsuariosRouter);
-
-// Suficiencias
 app.use("/api/suficiencias", authRequired, suficienciasRouter);
-
 app.use("/api/comprometido", authRequired, comprometidoRouter);
-app.use("/api/devengados", authRequired, devengadosRouter);
-
-// Presupuesto / detalles / projects / etc.
+app.use("/api/devengado", authRequired, devengadoRouter);
 app.use("/api", presupuestoRouter);
-
-// ✅ Blindaje específico: PARTIDAS (prohíbe escritura a AREA)
 app.use("/api/catalogos/partidas", authRequired, blockPartidasWrite);
-
-// ✅ Catálogos (si quieres que solo logueados los vean)
 app.use("/api/catalogos", authRequired, catalogosRoutes);
-
 app.use("/api/catalogos/metas", authRequired, metasRouter);
 
 // =====================================================
 //  HEALTH
 // =====================================================
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
-
 // =====================================================
 //  404 — RUTAS NO ENCONTRADAS
 // =====================================================
@@ -180,7 +150,6 @@ app.use((req, res) => {
   }
   return res.status(404).sendFile(path.join(__dirname, "public", "404.html"));
 });
-
 // =====================================================
 //  ARRANQUE
 // =====================================================
