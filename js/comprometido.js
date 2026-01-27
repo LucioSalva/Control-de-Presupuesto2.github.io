@@ -182,7 +182,7 @@
               readonly value="${importe}">
           </td>
         </tr>
-        `
+        `,
       );
     });
   }
@@ -321,7 +321,8 @@
           headers: { ...authHeaders() },
         });
 
-        const payload = data?.payload || data;
+        // ✅ TU API regresa { ok:true, data:{...} }
+        const payload = data && data.data ? data.data : data;
 
         localStorage.setItem(
           "cp_last_suficiencia",
@@ -330,27 +331,29 @@
             payload,
             loaded_from: "api",
             loaded_at: new Date().toISOString(),
-          })
+          }),
         );
 
         return payload;
       } catch (e) {
         console.warn(
           "[COMPROMETIDO] API falló, usando LocalStorage:",
-          e.message
+          e.message,
         );
       }
     }
 
     const raw = localStorage.getItem("cp_last_suficiencia");
-    if (!raw)
+    if (!raw) {
       throw new Error(
-        "No hay datos. Primero guarda una Suficiencia o abre comprometido.html?id=XXX"
+        "No hay datos. Primero guarda una Suficiencia o abre comprometido.html?id=XXX",
       );
+    }
 
     const obj = JSON.parse(raw);
-    if (!obj?.payload)
+    if (!obj || !obj.payload) {
       throw new Error("cp_last_suficiencia no contiene payload válido.");
+    }
 
     return obj.payload;
   }
@@ -365,10 +368,10 @@
     console.log("[COMPROMETIDO] detalle length:", payload.detalle?.length);
 
     // Folio
-  setVal(
-    "no_suficiencia",
-    payload.folio_num != null ? formatFolio(payload.folio_num) : ""
-  );
+    setVal(
+      "no_suficiencia",
+      payload.folio_num != null ? formatFolio(payload.folio_num) : "",
+    );
 
     // Generales
     setVal("fecha", payload.fecha);
@@ -378,12 +381,12 @@
     // Proyecto y fuente (SELECTs)
     setSelectVal(
       "id_proyecto",
-      payload.id_proyecto != null ? String(payload.id_proyecto) : ""
+      payload.id_proyecto != null ? String(payload.id_proyecto) : "",
     );
 
     setSelectVal(
       "fuente",
-      payload.id_fuente != null ? String(payload.id_fuente) : ""
+      payload.id_fuente != null ? String(payload.id_fuente) : "",
     );
 
     // Clave programática (inputs readonly)
@@ -460,6 +463,33 @@
       if (!id) return;
       window.location.href = `comprometido.html?id=${encodeURIComponent(id)}`;
     });
+
+    const btnVerDevengado = document.getElementById("btn-ver-devengado");
+
+    btnVerDevengado?.addEventListener("click", (e) => {
+      e.preventDefault();
+
+      const currentPayload = state.payload;
+      const idRef =
+        currentPayload && currentPayload.id ? String(currentPayload.id) : "";
+
+      if (!idRef) {
+        alert("No hay ID para pasar a Devengado.");
+        return;
+      }
+
+      localStorage.setItem(
+        "cp_last_comprometido",
+        JSON.stringify({
+          id: idRef,
+          payload: currentPayload,
+          loaded_from: "comprometido",
+          loaded_at: new Date().toISOString(),
+        }),
+      );
+
+      window.location.href = `devengado.html?id=${encodeURIComponent(idRef)}`;
+    });
   }
 
   // ---------------------------
@@ -471,10 +501,10 @@
     try {
       // ✅ 1) Carga catálogos primero (si tu HTML tiene selects)
       await loadProyectosCatalog().catch((e) =>
-        console.warn("[COMPROMETIDO] proyectos:", e.message)
+        console.warn("[COMPROMETIDO] proyectos:", e.message),
       );
       await loadFuentesCatalog().catch((e) =>
-        console.warn("[COMPROMETIDO] fuentes:", e.message)
+        console.warn("[COMPROMETIDO] fuentes:", e.message),
       );
 
       // ✅ 2) Carga payload

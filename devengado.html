@@ -6,29 +6,59 @@
   <title>Devengado 2026</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
+  <!-- Bootstrap -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 
+  <!-- Tus CSS -->
   <link rel="stylesheet" href="css/devengado.css">
   <link rel="stylesheet" href="css/nabvar.css">
+
+  <style>
+    .alerta-cancelado {
+      background-color: #dc3545;
+      color: white;
+      padding: 10px 20px;
+      text-align: center;
+      font-weight: bold;
+      font-size: 14px;
+      display: none;
+    }
+
+    .alerta-cancelado.show {
+      display: block;
+    }
+
+    .input-editable {
+      background-color: #fff9c4 !important;
+      border: 1px solid #ffc107 !important;
+    }
+
+    .monto-error {
+      border-color: #dc3545 !important;
+      background-color: #f8d7da !important;
+    }
+
+    .input-no-click {
+      pointer-events: none;
+    }
+  </style>
 </head>
 
 <body>
+
+  <!-- ALERTA DOCUMENTO VENCIDO/CANCELADO -->
+  <div id="alertaCancelado" class="alerta-cancelado">
+    <i class="bi bi-exclamation-triangle me-2"></i>
+    DOCUMENTO CANCELADO / VENCIDO (VIGENCIA MENSUAL)
+  </div>
+
   <!-- NAVBAR PRINCIPAL -->
   <nav class="navbar navbar-expand-lg shadow-sm">
     <div class="container-fluid">
       <a class="navbar-brand fw-semibold">
         <i class="bi bi-currency-dollar me-2"></i>Control Presupuestal
       </a>
-
-      <form id="nav-search" class="nav-search" autocomplete="off">
-        <button type="submit" class="nav-search__btn" aria-label="Buscar ID">
-          <i class="bi bi-search"></i>
-        </button>
-        <input id="proj-code" type="text" name="proj-code"
-          class="form-control form-control-sm nav-search__input"
-          aria-label="ID del proyecto" placeholder="ID Suficiencia (ej. 123)">
-      </form>
 
       <div class="logo-container">
         <img src="/public/img/ayuntamiento-de-ecatepec.png" alt="Ayuntamiento de Ecatepec" class="navbar-logo">
@@ -47,27 +77,68 @@
   <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm" style="min-height: 40px;">
     <div class="container-fluid">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0" style="flex-direction: row;">
-        <li class="nav-item"><a class="nav-link" href="suficiencia_presupuestal.html"><i class="bi bi-file-earmark-text me-1"></i>Suficiencia Presupuestal</a></li>
-        <li class="nav-item"><a class="nav-link" href="projects.html"><i class="bi bi-diagram-3 me-1"></i>Proyectos</a></li>
-        <li class="nav-item"><a class="nav-link" href="index.html"><i class="bi bi-house me-1"></i>Presupuesto</a></li>
-        <li class="nav-item"><a class="nav-link" href="comprometido.html"><i class="bi bi-lock me-1"></i>Comprometido</a></li>
-        <li class="nav-item"><a class="nav-link active" href="devengado.html"><i class="bi bi-lock me-1"></i>Devengado</a></li>
+        <li class="nav-item">
+          <a class="nav-link" href="suficiencia_presupuestal.html">
+            <i class="bi bi-file-earmark-text me-1"></i>Suficiencia Presupuestal
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="comprometido.html">
+            <i class="bi bi-lock me-1"></i>Comprometido
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active" href="devengado.html">
+            <i class="bi bi-check2-square me-1"></i>Devengado
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="projects.html">
+            <i class="bi bi-diagram-3 me-1"></i>Proyectos
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="index.html">
+            <i class="bi bi-house me-1"></i>Presupuesto
+          </a>
+        </li>
       </ul>
+      <!-- <button id="btn-export-xlsx" class="btn btn-outline-success btn-sm">
+        <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
+      </button>
+
+      <button id="btn-reset" class="btn btn-outline-danger btn-sm">
+        <i class="bi bi-eraser me-1"></i>Reiniciar
+      </button> -->
     </div>
   </nav>
 
+  <!-- BARRA DE ACCIONES -->
   <div class="container mt-5 mb-2 no-print">
-    <div class="d-flex gap-2 justify-content-start mt-3">
-      <button id="btn-descargar-pdf" class="btn btn-outline-danger btn-sm">
-        <i class="bi bi-file-earmark-pdf me-1"></i>Descargar PDF
-      </button>
+    <div class="d-flex flex-wrap gap-2 justify-content-between mt-3">
+      <div class="d-flex flex-wrap gap-2">
+        <button id="btn-guardar" class="btn btn-success btn-sm">
+          <i class="bi bi-save me-1"></i>Guardar Devengado
+        </button>
 
-      <button id="btn-recargar" class="btn btn-secondary btn-sm">
-        <i class="bi bi-arrow-repeat me-1"></i>Recargar datos
-      </button>
+        <button id="btn-descargar-pdf" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-file-earmark-pdf me-1"></i>Descargar PDF
+        </button>
+
+        <button id="btn-recargar" class="btn btn-secondary btn-sm">
+          <i class="bi bi-arrow-repeat me-1"></i>Recargar datos
+        </button>
+      </div>
+
+      <div class="d-flex">
+        <button id="btn-cancelar" class="btn btn-outline-danger btn-sm">
+          <i class="bi bi-x-circle me-1"></i>Cancelar Documento
+        </button>
+      </div>
     </div>
   </div>
 
+  <!-- CONTENEDOR FORMATO -->
   <div class="form-container">
     <div class="row mb-3">
       <div class="col-3 text-center">
@@ -77,103 +148,111 @@
         <div class="form-title">H. AYUNTAMIENTO DE ECATEPEC DE MORELOS</div>
         <div class="sub-title">DEVENGADO - EJERCICIO FISCAL 2026</div>
       </div>
+
       <div class="col-3">
         <table class="table table-bordered mb-0">
           <tr>
-            <th class="table-header" style="background-color: rgb(180, 180, 180);">No. de devenngado</th>
+            <th class="table-header" style="background-color: rgb(180, 180, 180);">No. de Devengado</th>
           </tr>
           <tr>
             <td>
-              <input type="text" class="form-control form-control-sm ro ro-folio" style="text-align: end;"
-                name="no_suficiencia" readonly>
+              <input type="text"
+                class="form-control form-control-sm ro ro-folio text-end as-text td-text text-strong input-no-click"
+                name="no_devengado" readonly>
+            </td>
+          </tr>
+
+          <tr>
+            <th class="table-header" style="background-color: rgb(220, 220, 220); font-size: 10px;">Ref. Comprometido
+            </th>
+          </tr>
+          <tr>
+            <td>
+              <input type="text" class="form-control form-control-sm ro text-end as-text td-text input-no-click"
+                name="no_comprometido" readonly style="font-size: 10px;">
             </td>
           </tr>
         </table>
       </div>
     </div>
 
-    <!-- MISMA TABLA DE SUFICIENCIA -->
+    <!-- DATOS GENERALES -->
     <table class="table table-bordered mb-2 formato">
       <colgroup>
-        <col class="c-lbl">
-        <col class="c-val">
-        <col class="c-lbl">
-        <col class="c-val">
+        <col style="width:20%;">
+        <col style="width:30%;">
+        <col style="width:20%;">
+        <col style="width:30%;">
       </colgroup>
 
       <tr>
         <th class="table-header">FECHA DE ELABORACIÓN:</th>
         <td colspan="3">
-          <input type="date" class="form-control form-control-sm as-text text-strong td-text" name="fecha" readonly>
+          <input type="date" class="form-control form-control-sm as-text text-strong td-text" name="fecha">
         </td>
       </tr>
 
       <tr>
         <th class="table-header">NOMBRE DE LA DEPENDENCIA GENERAL:</th>
         <td>
-          <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia" readonly>
-          <input type="hidden" name="id_dgeneral">
+          <input type="text" class="form-control form-control-sm as-text text-strong td-text input-no-click"
+            name="dependencia" readonly>
         </td>
 
         <th class="table-header">NOMBRE DE LA DEPENDENCIA AUXILIAR:</th>
         <td>
-          <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia_aux" readonly>
-          <input type="hidden" name="id_dauxiliar">
-        </td>
-      </tr>
-
-      <tr>
-        <th class="table-header">PROYECTO:</th>
-        <td>
-          <select class="form-select form-select-sm" name="id_proyecto" disabled>
-            <option value="">-- Selecciona un proyecto --</option>
-          </select>
-        </td>
-
-        <th class="table-header">FUENTE DE FINANCIAMIENTO:</th>
-        <td>
-          <select class="form-select form-select-sm" name="fuente" disabled>
-            <option value="">-- Selecciona una fuente --</option>
-          </select>
-          <input type="hidden" name="id_fuente">
+          <input type="text" class="form-control form-control-sm as-text text-strong td-text input-no-click"
+            name="dependencia_aux" readonly>
         </td>
       </tr>
 
       <tr>
         <th class="table-header">CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:</th>
         <td>
-          <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="clave_programatica" readonly>
-          <div class="small mt-1 text-muted" id="claveProgDesc">—</div>
+          <input type="text" class="form-control form-control-sm as-text text-strong td-text input-no-click"
+            name="clave_programatica" readonly>
         </td>
 
-        <th class="table-header table-header-strong">PROGRAMACIÓN DE PAGO:</th>
+        <th class="table-header">FUENTE DE FINANCIAMIENTO:</th>
         <td>
-          <select class="form-select form-select-sm" name="mes_pago" readonly>
-            <option value="ENERO">ENERO</option>
-            <option value="FEBRERO">FEBRERO</option>
-            <option value="MARZO">MARZO</option>
-            <option value="ABRIL">ABRIL</option>
-            <option value="MAYO">MAYO</option>
-            <option value="JUNIO">JUNIO</option>
-            <option value="JULIO">JULIO</option>
-            <option value="AGOSTO">AGOSTO</option>
-            <option value="SEPTIEMBRE">SEPTIEMBRE</option>
-            <option value="OCTUBRE">OCTUBRE</option>
-            <option value="NOVIEMBRE">NOVIEMBRE</option>
-            <option value="DICIEMBRE">DICIEMBRE</option>
-          </select>
+          <input type="text" class="form-control form-control-sm as-text text-strong td-text input-no-click"
+            name="fuente" readonly>
+        </td>
+      </tr>
 
-          <input type="text"
-            class="form-control form-control-sm as-text td-text text-strong text-end input-no-click mt-2"
-            name="cantidad_pago" placeholder="Cantidad" readonly>
+      <tr>
+        <th class="table-header table-header-strong">PROGRAMACIÓN DE PAGO:</th>
+        <td colspan="3">
+          <div class="d-flex gap-2 align-items-center">
+            <input type="text" class="form-control form-control-sm as-text td-text input-no-click" name="mes_pago"
+              readonly>
+
+            <input type="text" class="form-control form-control-sm as-text td-text text-strong text-end input-no-click"
+              name="cantidad_pago" readonly>
+          </div>
+        </td>
+      </tr>
+
+      <tr>
+        <th class="table-header" style="background-color:#fff3cd;">MONTO COMPROMETIDO:</th>
+        <td>
+          <input type="text" class="form-control form-control-sm as-text td-text text-strong text-end input-no-click"
+            name="monto_comprometido" readonly style="background-color:#fff3cd;">
+        </td>
+
+        <th class="table-header" style="background-color:#d4edda;">MONTO A DEVENGAR:</th>
+        <td>
+          <input type="number" step="0.01" min="0"
+            class="form-control form-control-sm as-text td-text text-strong text-end input-editable"
+            name="monto_devengado" placeholder="0.00">
         </td>
       </tr>
     </table>
 
-    <!-- Detalle (MISMO) -->
+    <!-- Detalle -->
     <div class="d-flex align-items-center justify-content-between mb-2">
       <div class="fw-bold" style="font-size: 11px;">Detalle:</div>
-      <div class="small text-muted">Vista solo lectura</div>
+      <div class="small text-muted">Los importes pueden editarse (no exceder el monto comprometido)</div>
     </div>
 
     <table class="table table-bordered mb-3">
@@ -184,18 +263,17 @@
           <th class="table-header" style="width: 20%; background-color: rgb(180, 180, 180);">Concepto de partida</th>
           <th class="table-header" style="width: 20%; background-color: rgb(180, 180, 180);">Justificación</th>
           <th class="table-header" style="width: 33%; background-color: rgb(180, 180, 180);">Descripción</th>
-          <th class="table-header" style="width: 10%; background-color: rgb(180, 180, 180);">Importe solicitado</th>
+          <th class="table-header" style="width: 10%; background-color: rgb(180, 180, 180);">Importe</th>
         </tr>
       </thead>
       <tbody id="detalleBody"></tbody>
     </table>
 
-    <!-- META + TOTALES (MISMO) -->
+    <!-- META + TOTALES -->
     <table class="table table-bordered mb-2">
       <tr>
-        <th class="table-header align-middle text-center" style="width:15%; background-color: rgb(180, 180, 180);" rowspan="5">
-          META:
-        </th>
+        <th class="table-header align-middle text-center" style="width:15%; background-color: rgb(180, 180, 180);"
+          rowspan="5">META:</th>
 
         <td class="align-middle" style="width:65%;" rowspan="5">
           <div class="d-flex align-items-center h-100">
@@ -205,65 +283,72 @@
 
         <th class="table-header text-end" style="width:10%; background-color: rgb(180, 180, 180);">SUBTOTAL:</th>
         <td style="width:10%;">
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="subtotal" readonly>
+          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
+            name="subtotal" readonly>
         </td>
       </tr>
 
       <tr>
         <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">IVA:</th>
         <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="iva" readonly>
+          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="iva"
+            readonly>
         </td>
       </tr>
 
       <tr>
         <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">ISR:</th>
         <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="isr" readonly>
+          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="isr"
+            readonly>
         </td>
       </tr>
 
       <tr>
         <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">IEPS:</th>
         <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="ieps" readonly>
+          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="ieps"
+            readonly>
         </td>
       </tr>
 
       <tr>
         <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">TOTAL:</th>
         <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="total" readonly>
+          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
+            name="total" readonly>
         </td>
       </tr>
     </table>
 
-    <!-- Impuestos (mismos radios, solo lectura) -->
+    <!-- Impuestos -->
     <div class="d-flex flex-wrap align-items-center justify-content-end gap-3 mb-3">
       <div class="form-check m-0">
-        <input class="form-check-input" type="radio" name="impuesto_tipo" value="NONE" disabled>
+        <input class="form-check-input" type="radio" name="impuesto_tipo" value="NONE">
         <label class="form-check-label">Sin impuesto</label>
       </div>
+
       <div class="form-check m-0">
-        <input class="form-check-input" type="radio" name="impuesto_tipo" value="IVA" disabled>
+        <input class="form-check-input" type="radio" name="impuesto_tipo" value="IVA">
         <label class="form-check-label">IVA 16%</label>
       </div>
-      <div class="d-flex align-items-center gap-2">
-        <div class="form-check m-0">
-          <input class="form-check-input" type="radio" name="impuesto_tipo" value="ISR" disabled>
-          <label class="form-check-label">ISR</label>
-        </div>
-        <input type="number" class="form-control form-control-sm text-end" name="isr_tasa" style="width:120px;"
-          placeholder="Ej. 10 %" min="0" step="0.01" disabled />
-      </div>  
 
       <div class="d-flex align-items-center gap-2">
         <div class="form-check m-0">
-          <input class="form-check-input" type="radio" name="impuesto_tipo" value="IEPS" disabled>
+          <input class="form-check-input" type="radio" name="impuesto_tipo" value="ISR">
+          <label class="form-check-label">ISR</label>
+        </div>
+        <input type="number" class="form-control form-control-sm text-end" name="isr_tasa" style="width:120px;"
+          placeholder="Ej. 10 %" min="0" step="0.01" />
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <div class="form-check m-0">
+          <input class="form-check-input" type="radio" name="impuesto_tipo" value="IEPS">
           <label class="form-check-label">IEPS</label>
         </div>
         <input type="number" class="form-control form-control-sm text-end" name="ieps_tasa" style="width:120px;"
-          placeholder="Ej. 8 %" min="0" step="0.01" disabled />
+          placeholder="Ej. 8 %" min="0" step="0.01" />
       </div>
     </div>
 
@@ -271,61 +356,160 @@
       <tr>
         <th class="table-header" style="width: 15%; background-color: rgb(180, 180, 180);">CANTIDAD CON LETRA:</th>
         <td style="width: 85%;">
-          <input type="text" class="form-control form-control-sm ro as-text td-text input-no-click" name="cantidad_con_letra" readonly>
+          <input type="text" class="form-control form-control-sm ro as-text td-text input-no-click"
+            name="cantidad_con_letra" readonly>
         </td>
       </tr>
     </table>
 
-    <!-- Leyenda + firmas (igual) -->
+    <!-- Leyenda -->
     <div class="border p-2" style="font-size:11px; text-align:justify; background-color: rgb(180, 180, 180);">
       <p class="mb-2">
         El presente Devengado únicamente acredita la disponibilidad de recursos en la(s) clave(s) indicada(s),
-        sin que ello implique autorización para realizar procesos de licitación, adjudicación, contratación, adquisición, pago
-        o validación documental, los cuales son responsabilidad exclusiva del ÁREA SOLICITANTE.
+        sin que ello implique autorización para realizar procesos de licitación, adjudicación, contratación,
+        adquisición,
+        pago o validación documental, los cuales son responsabilidad exclusiva del ÁREA SOLICITANTE.
       </p>
       <p class="mb-2">
-        Esta autorización se emite con base en el techo presupuestal aprobado para la unidad administrativa correspondiente,
-        siendo también responsabilidad del ÁREA SOLICITANTE la planeación, administración, verificación y comprobación del uso de los recursos.
+        Esta autorización se emite con base en el techo presupuestal aprobado para la unidad administrativa
+        correspondiente,
+        siendo también responsabilidad del ÁREA SOLICITANTE la planeación, administración, verificación y comprobación
+        del uso de los recursos.
       </p>
       <p class="mb-2">
-        El ejercicio del gasto deberá apegarse a lo establecido en el Clasificador por Objeto del Gasto Estatal y Municipal,
-        incluido en el Manual para la Planeación, Programación y Presupuesto de Egresos Municipal vigente, en los Lineamientos Generales
-        para la Evaluación de Programas Presupuestarios Municipales, y en la normatividad municipal, estatal y complementaria aplicable.
+        El ejercicio del gasto deberá apegarse a lo establecido en el Clasificador por Objeto del Gasto Estatal y
+        Municipal,
+        incluido en el Manual para la Planeación, Programación y Presupuesto de Egresos Municipal vigente, en los
+        Lineamientos Generales
+        para la Evaluación de Programas Presupuestarios Municipales, y en la normatividad municipal, estatal y
+        complementaria aplicable.
       </p>
       <p class="mb-0">
-        El recurso deberá ejercerse en el mismo mes de emisión de esta suficiencia; en caso contrario, perderá validez y deberá tramitarse nuevamente con fecha del mes en curso.
+        El recurso deberá ejercerse en el mismo mes de emisión de este devengado; en caso contrario, perderá validez y
+        deberá tramitarse nuevamente con fecha del mes en curso.
       </p>
     </div>
 
+    <!-- Firmas (4 columnas) -->
     <table class="table table-bordered mt-3 mb-0">
       <tr>
-        <th class="text-center table-header" style="background:#d9d9d9; width:33.33%; font-size:11px;">
-          COORDINACIÓN ADMINISTRATIVA DEL ÁREA SOLICITANTE
+        <th class="text-center table-header" style="background:#d9d9d9; width:25%; font-size:10px;">ÁREA SOLICITANTE
         </th>
-        <th class="text-center table-header" style="background:#d9d9d9; width:33.33%; font-size:11px;">
-          *ÁREA SOLICITANTE
-        </th>
-        <th class="text-center table-header" style="background:#d9d9d9; width:33.33%; font-size:11px;">
-          DIRECCIÓN SOLICITANTE
-        </th>
+        <th class="text-center table-header" style="background:#d9d9d9; width:25%; font-size:10px;">DIRECCIÓN
+          SOLICITANTE</th>
+        <th class="text-center table-header" style="background:#d9d9d9; width:25%; font-size:10px;">SUFICIENCIA
+          PRESUPUESTAL</th>
+        <th class="text-center table-header" style="background:#d9d9d9; width:25%; font-size:10px;">AUTORIZA TESORERO
+          MUNICIPAL</th>
       </tr>
+
       <tr>
-        <td style="height:70px;"></td>
-        <td style="height:70px;"></td>
-        <td style="height:70px;"></td>
+        <td class="text-center" style="font-size:9px; font-weight:bold; padding:4px;">
+          <span id="firmaAreaSolicitante">-</span>
+        </td>
+        <td class="text-center" style="font-size:9px; font-weight:bold; padding:4px;">
+          <span id="firmaDireccionSolicitante">-</span>
+        </td>
+        <td class="text-center" style="font-size:9px; font-weight:bold; padding:4px;">
+          SUBDIRECCIÓN DE CONTROL Y REGISTRO PRESUPUESTAL
+        </td>
+        <td class="text-center" style="font-size:9px; font-weight:bold; padding:4px;">
+          TESORERÍA MUNICIPAL
+        </td>
+      </tr>
+
+      <tr>
+        <!-- editable -->
+        <td class="text-center" style="height:25px; vertical-align:bottom; padding:4px;">
+          <input type="text" class="text-center firma-nombre-input" name="firma_area_nombre"
+            placeholder="Nombre del firmante"
+            style="font-size:9px; border:none; background:transparent; width:100%; font-weight:bold; outline:none;">
+        </td>
+
+        <!-- editable -->
+        <td class="text-center" style="height:25px; vertical-align:bottom; padding:4px;">
+          <input type="text" class="text-center firma-nombre-input" name="firma_direccion_nombre"
+            placeholder="Nombre del firmante"
+            style="font-size:9px; border:none; background:transparent; width:100%; font-weight:bold; outline:none;">
+        </td>
+
+        <!-- editable -->
+        <td class="text-center" style="height:25px; vertical-align:bottom; padding:4px;">
+          <input type="text" class="text-center firma-nombre-input" name="firma_suficiencia_nombre"
+            placeholder="Nombre (Suficiencia)"
+            style="font-size:9px; border:none; background:transparent; width:100%; font-weight:bold; outline:none;">
+        </td>
+
+        <!-- fijo -->
+        <td class="text-center"
+          style="height:25px; vertical-align:bottom; padding:4px; font-size:9px; font-weight:bold;">
+          LIC. ALEJANDRO HERNANDEZ AGUILAR
+        </td>
       </tr>
     </table>
 
   </div>
 
+  <!-- MODAL CONFIRMAR CANCELACIÓN -->
+  <div class="modal fade" id="modalCancelar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title"><i class="bi bi-exclamation-triangle me-2"></i>Confirmar Cancelación</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-3">¿Estás seguro de que deseas cancelar este recurso?</p>
+          <div class="alert alert-warning mb-0">
+            <i class="bi bi-info-circle me-2"></i>
+            <strong>Esta acción es irreversible.</strong> El monto será devuelto al presupuesto disponible del área.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No, mantener</button>
+          <button type="button" class="btn btn-danger" id="btnConfirmarCancelar">
+            <i class="bi bi-x-circle me-1"></i>Sí, cancelar documento
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CONFIRMAR GUARDADO -->
+  <div class="modal fade" id="modalGuardar" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Confirmar Guardado</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <p>¿Deseas guardar este devengado presupuestal?</p>
+          <div id="infoLiberacion" class="alert alert-info" style="display: none;">
+            <i class="bi bi-info-circle me-2"></i>
+            Se liberará <strong id="montoLiberar">$0.00</strong> del presupuesto comprometido.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-success" id="btnConfirmarGuardar">
+            <i class="bi bi-save me-1"></i>Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
   <script src="js/config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 
-  <script type="module" src="js/comprometido.js"></script>
+  <script type="module" src="js/devengado.js"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="js/user-info.js"></script>
+
 </body>
 
 </html>

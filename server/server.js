@@ -152,11 +152,8 @@ app.use("/api/admin/usuarios", adminUsuariosRouter);
 // Suficiencias
 app.use("/api/suficiencias", authRequired, suficienciasRouter);
 
-// Comprometido (solo lectura)
 app.use("/api/comprometido", authRequired, comprometidoRouter);
-// Devengado (solo lectura)
-app.use("/api/devengado", authRequired, devengadoRouter);
-
+app.use("/api/devengados", authRequired, devengadosRouter);
 
 // Presupuesto / detalles / projects / etc.
 app.use("/api", presupuestoRouter);

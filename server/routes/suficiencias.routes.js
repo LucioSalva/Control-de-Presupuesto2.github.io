@@ -1,5 +1,5 @@
 import express from "express";
-import { query, getClient } from "../db.js"; // 👈 necesitas getClient para transacción
+import { query, getClient } from "../db.js";
 
 const router = express.Router();
 
@@ -42,13 +42,16 @@ router.post("/", async (req, res) => {
   const client = await getClient();
   try {
     const b = req.body || {};
+
     const fechaBaseRaw = b.fecha ? new Date(b.fecha) : new Date();
-    const fechaBase = Number.isNaN(fechaBaseRaw.getTime())
-      ? new Date()
-      : fechaBaseRaw;
+    const fechaBase = Number.isNaN(fechaBaseRaw.getTime()) ? new Date() : fechaBaseRaw;
+
     const mes = String(fechaBase.getMonth() + 1).padStart(2, "0");
     const tipo = "SP";
     const prefijo = `ECA-${mes}-${tipo}-`;
+
+    // ✅ alineación: "departamento" en DB viene del front "dependencia_aux"
+    const departamento = b.departamento ?? b.dependencia_aux ?? null;
 
     await client.query("BEGIN");
     await client.query("LOCK TABLE suficiencias IN EXCLUSIVE MODE");
@@ -62,6 +65,7 @@ router.post("/", async (req, res) => {
       `,
       [`${prefijo}%`, fechaBase]
     );
+
     const consecutivo = Number(rConsec.rows?.[0]?.consecutivo || 1);
     const noSuficiencia = `${prefijo}${String(consecutivo).padStart(4, "0")}`;
 
@@ -106,7 +110,7 @@ router.post("/", async (req, res) => {
         $6,
         $7, $8, $9, $10, $11, $12,
         $13,
-        $14, $15, $16, $17, $18, $19, 
+        $14, $15, $16, $17, $18, $19,
         $20, $21, $22,
         NOW(),
         n.folio_num
@@ -124,7 +128,7 @@ router.post("/", async (req, res) => {
       noSuficiencia,
       b.fecha,
       b.dependencia,
-      b.departamento,
+      departamento,
       b.fuente,
       b.mes_pago,
       b.clave_programatica,
@@ -197,31 +201,59 @@ router.post("/", async (req, res) => {
   }
 });
 
-
 /* =====================================================
    GET /api/suficiencias/buscar?numero=000001
-   (ejemplo básico por folio)
+   - Si es numérico => folio_num
+   - Si no => no_suficiencia ILIKE
+   - AREA => filtra por DG/DA del usuario
    ===================================================== */
 router.get("/buscar", async (req, res) => {
   try {
-    const numero = pad6(req.query.numero);
-    if (!numero) {
+    const role = getRole(req);
+    const numeroRaw = String(req.query.numero || "").trim();
+
+    if (!numeroRaw) {
       return res.status(400).json({ error: "Falta parametro numero" });
     }
 
-    // Ajusta la columna a lo que realmente usas:
-    // - si buscas por folio_num (int) -> convierte a number
-    // - si buscas por no_suficiencia (texto ECA-..) -> usa texto
-    const folio = Number(numero);
-    if (!Number.isFinite(folio)) {
-      return res.status(400).json({ error: "numero inválido" });
+    const numero = pad6(numeroRaw);
+
+    const where = [];
+    const params = [];
+    let i = 1;
+
+    // criterio
+    if (/^\d+$/.test(numero)) {
+      const folio = Number(numero);
+      where.push(`folio_num = $${i++}`);
+      params.push(folio);
+    } else {
+      // texto (ej: ECA-01-SP-0001)
+      where.push(`no_suficiencia ILIKE $${i++}`);
+      params.push(`%${numero}%`);
     }
 
-    const r = await query(
-      `SELECT * FROM suficiencias WHERE folio_num = $1 ORDER BY id DESC LIMIT 50`,
-      [folio]
-    );
+    // seguridad para AREA
+    if (role === "AREA") {
+      if (req.user?.id_dgeneral != null) {
+        where.push(`id_dgeneral = $${i++}`);
+        params.push(req.user.id_dgeneral);
+      }
+      if (req.user?.id_dauxiliar != null) {
+        where.push(`id_dauxiliar = $${i++}`);
+        params.push(req.user.id_dauxiliar);
+      }
+    }
 
+    const sql = `
+      SELECT id, folio_num, no_suficiencia, fecha, id_dgeneral, id_dauxiliar
+      FROM suficiencias
+      WHERE ${where.join(" AND ")}
+      ORDER BY id DESC
+      LIMIT 50
+    `;
+
+    const r = await query(sql, params);
     return res.json({ ok: true, data: r.rows });
   } catch (err) {
     console.error("[GET buscar] error:", err);
@@ -229,5 +261,66 @@ router.get("/buscar", async (req, res) => {
   }
 });
 
+/* =====================================================
+   ✅ GET /api/suficiencias/:id
+   Trae cabecera + detalle
+   AREA => solo si coincide DG/DA
+   ===================================================== */
+router.get("/:id", async (req, res) => {
+  try {
+    const role = getRole(req);
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ error: "id inválido" });
+    }
+
+    const where = [`id = $1`];
+    const params = [id];
+    let i = 2;
+
+    if (role === "AREA") {
+      if (req.user?.id_dgeneral != null) {
+        where.push(`id_dgeneral = $${i++}`);
+        params.push(req.user.id_dgeneral);
+      }
+      if (req.user?.id_dauxiliar != null) {
+        where.push(`id_dauxiliar = $${i++}`);
+        params.push(req.user.id_dauxiliar);
+      }
+    }
+
+    // 1) Cabecera
+    const rHead = await query(
+      `SELECT *
+       FROM suficiencias
+       WHERE ${where.join(" AND ")}
+       LIMIT 1`,
+      params
+    );
+
+    if (!rHead.rows.length) {
+      return res.status(404).json({ error: "No encontrada" });
+    }
+
+    const head = rHead.rows[0];
+
+    // 2) Detalle
+    const rDet = await query(
+      `SELECT renglon, clave, concepto_partida, justificacion, descripcion, importe
+       FROM suficiencia_detalle
+       WHERE id_suficiencia = $1
+       ORDER BY renglon ASC`,
+      [id]
+    );
+
+    return res.json({
+      ...head,
+      detalle: rDet.rows || [],
+    });
+  } catch (err) {
+    console.error("[GET /api/suficiencias/:id] error:", err);
+    return res.status(500).json({ error: "Error al obtener suficiencia", db: err.message });
+  }
+});
 
 export default router;

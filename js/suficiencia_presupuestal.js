@@ -1,14 +1,14 @@
-((() => {
+(() => {
   const MAX_ROWS = 20;
   const START_ROWS = 3;
 
-  // ✅ API base: si no existe window.API_URL, usa localhost:3000
+  // ✅ API base
   const API = (window.API_URL || "http://localhost:3000").replace(/\/$/, "");
 
-  // ✅ PDF plantilla (ruta real)
+  // ✅ PDF plantilla
   const SUF_PDF_TEMPLATE_URL = "/public/PDF/SUFICIENCIA_PRESUPUESTAL_2025.pdf";
 
-  // ✅ Debug de campos PDF (APAGADO por defecto)
+  // ✅ Debug PDF fields
   const DEBUG_PDF_FIELDS = false;
 
   // ---------------------------
@@ -20,7 +20,7 @@
   const btnVerComprometido = document.getElementById("btn-ver-comprometido");
   const btnVerDevengado = document.getElementById("btn-ver-devengado");
 
-  const btnExportXlsx = document.getElementById("btn-export-xlsx");
+  const btnExportXlsx = document.getElementById("btn-export-xlsx"); // si lo usas después
 
   const btnAddRow = document.getElementById("btn-add-row");
   const btnRemoveRow = document.getElementById("btn-remove-row");
@@ -30,14 +30,14 @@
   const modal = modalEl ? new bootstrap.Modal(modalEl) : null;
 
   // ---------------------------
-  // ✅ BUSCADOR (botón + panel)
+  // ✅ BUSCADOR
   // ---------------------------
   const btnToggleBuscar = document.getElementById("btnToggleBuscar");
   const panelBuscarEl = document.getElementById("panelBuscarSuf");
 
   const txtNumeroSuf = document.getElementById("txtNumeroSuf");
-  const txtDepClave = document.getElementById("txtDepClave");
-  const txtProgClave = document.getElementById("txtProgClave");
+  const txtDepClave = document.getElementById("txtDepClave"); // si lo usarás luego
+  const txtProgClave = document.getElementById("txtProgClave"); // si lo usarás luego
 
   const btnBuscarNumero = document.getElementById("btnBuscarNumero");
   const btnBuscarClaves = document.getElementById("btnBuscarClaves");
@@ -57,7 +57,7 @@
   let partidasMap = {}; // { "5151": "..." }
 
   // ---------------------------
-  // AUTH ✅ (incluye cp_token)
+  // AUTH ✅
   // ---------------------------
   const getToken = () =>
     localStorage.getItem("cp_token") ||
@@ -106,6 +106,7 @@
     if (!r.ok) {
       const msg =
         data?.db?.message ||
+        data?.db ||
         data?.error ||
         data?.message ||
         `HTTP ${r.status} en ${url}`;
@@ -123,34 +124,13 @@
   }
 
   // ---------------------------
-  // ✅ Helpers / funciones BUSCADOR
+  // ✅ Helpers BUSCADOR
   // ---------------------------
   function pad6(value) {
     const v = String(value || "").trim();
     if (!v) return "";
     if (/^\d+$/.test(v)) return v.padStart(6, "0");
     return v;
-  }
-
-  function renderResultadosBusqueda(rows) {
-    console.log("[BUSCAR] resultados:", rows);
-
-    if (!rows || !rows.length) {
-      alert("No encontrada (o no corresponde a tu área).");
-      return;
-    }
-
-    const folios = rows
-      .map((r) =>
-        String(r.no_suficiencia ?? r.folio_num ?? r.numero_suficiencia ?? "").trim()
-      )
-      .filter(Boolean);
-
-    alert(
-      `Encontrada(s): ${rows.length}${
-        folios.length ? "\nFolios: " + folios.join(", ") : ""
-      }`
-    );
   }
 
   async function buscarPorNumero(numero) {
@@ -167,6 +147,193 @@
     const url = `${API}/api/suficiencias/buscar?${qs.toString()}`;
     const json = await fetchJson(url, { headers: { ...authHeaders() } });
     renderResultadosBusqueda(json?.data || []);
+  }
+
+  // ===========================
+  // ✅ Cargar suficiencia al formulario
+  // ===========================
+  async function cargarSuficienciaEnFormulario(id) {
+    const data = await fetchJson(`${API}/api/suficiencias/${id}`, {
+      headers: { ...authHeaders() },
+    });
+
+    if (!data) {
+      alert("No se pudo cargar la suficiencia.");
+      return;
+    }
+
+    // ✅ Validar DG/DA contra usuario logueado (seguridad extra del front)
+    const user = getLoggedUser();
+    const myDg = Number(user?.id_dgeneral);
+    const myDa = Number(user?.id_dauxiliar);
+
+    if (
+      Number.isFinite(myDg) &&
+      Number.isFinite(myDa) &&
+      (Number(data.id_dgeneral) !== myDg || Number(data.id_dauxiliar) !== myDa)
+    ) {
+      alert("Esta suficiencia no corresponde a tu área (DG/DA).");
+      return;
+    }
+
+    // --- Cabecera ---
+    setVal(
+      "no_suficiencia",
+      data.no_suficiencia || String(data.folio_num || "").padStart(6, "0"),
+    );
+    setVal("fecha", data.fecha ? String(data.fecha).split("T")[0] : "");
+    setVal("dependencia", data.dependencia || "");
+    setVal("dependencia_aux", data.departamento || data.dependencia_aux || "");
+    setVal("mes_pago", data.mes_pago || "");
+    setVal("clave_programatica", data.clave_programatica || "");
+
+    // --- Proyecto ---
+    if (!Object.keys(proyectosById || {}).length) {
+      await loadProyectosCatalog();
+    }
+    // aplica candado con DG/DA actuales
+    applyProyectoFilters();
+
+    const idProy = data.id_proyecto != null ? String(data.id_proyecto) : "";
+    setVal("id_proyecto", idProy);
+
+    // ✅ Validación REAL: si el proyecto no está entre las options (candado), no dejarlo
+    const selProy = document.querySelector('[name="id_proyecto"]');
+    if (
+      selProy &&
+      idProy &&
+      !Array.from(selProy.options).some((o) => o.value === idProy)
+    ) {
+      alert(
+        "El proyecto de esta suficiencia no está permitido por el candado actual (DG/DA).",
+      );
+      setVal("id_proyecto", "");
+    }
+
+    updateClaveProgramatica();
+
+    // ✅ META: readonly y toma NOMBRE/DESCRIPCIÓN del PROYECTO
+    syncMetaFromProyecto();
+
+    // --- Fuente ---
+    if (data.id_fuente != null) {
+      setVal("fuente", String(data.id_fuente));
+      setVal("id_fuente", String(data.id_fuente));
+    }
+
+    // --- Impuestos (checkboxes) ---
+    const chkIVA = document.querySelector('[name="imp_iva"]');
+    const chkISR = document.querySelector('[name="imp_isr"]');
+    const chkIEPS = document.querySelector('[name="imp_ieps"]');
+
+    const isrInput = document.querySelector('[name="isr_tasa"]');
+    const iepsInput = document.querySelector('[name="ieps_tasa"]');
+
+    if (chkIVA) chkIVA.checked = safeNumber(data.iva) > 0;
+    if (chkISR) chkISR.checked = safeNumber(data.isr) > 0;
+    if (chkIEPS) chkIEPS.checked = safeNumber(data.ieps) > 0;
+
+    if (isrInput)
+      isrInput.value =
+        data.isr_tasa != null
+          ? String(data.isr_tasa)
+          : chkISR?.checked
+            ? "10"
+            : "";
+    if (iepsInput)
+      iepsInput.value =
+        data.ieps_tasa != null
+          ? String(data.ieps_tasa)
+          : chkIEPS?.checked
+            ? "8"
+            : "";
+
+    // --- Totales (si vienen del backend los respetas) ---
+    setVal("subtotal", safeNumber(data.subtotal).toFixed(2));
+    setVal("iva", safeNumber(data.iva).toFixed(2));
+    setVal("isr", safeNumber(data.isr).toFixed(2));
+    setVal("ieps", safeNumber(data.ieps).toFixed(2));
+    setVal("total", safeNumber(data.total).toFixed(2));
+    setVal("cantidad_pago", safeNumber(data.total).toFixed(2));
+    setVal("cantidad_con_letra", data.cantidad_con_letra || "");
+
+    // --- Detalle ---
+    const detalle = Array.isArray(data.detalle) ? data.detalle : [];
+    if (detalleBody) {
+      detalleBody.innerHTML = "";
+      detalle.forEach((row, idx) => {
+        const i = idx + 1;
+        detalleBody.insertAdjacentHTML("beforeend", rowTemplate(i));
+        setVal(`r${i}_clave`, row.clave || "");
+        setVal(`r${i}_concepto`, row.concepto_partida || "");
+        setVal(`r${i}_justificacion`, row.justificacion || "");
+        setVal(`r${i}_descripcion`, row.descripcion || "");
+        setVal(`r${i}_importe`, safeNumber(row.importe));
+      });
+
+      if (!detalle.length) initRows();
+    }
+
+    // refresca totales por si cambió algo
+    refreshTotales();
+
+    // marca id cargado
+    lastSavedId = Number(data.id);
+    if (btnVerComprometido) {
+      btnVerComprometido.disabled = false;
+      btnVerComprometido.dataset.id = String(lastSavedId);
+      btnVerComprometido.classList.remove("disabled");
+    }
+    if (btnVerDevengado) {
+      btnVerDevengado.disabled = false;
+      btnVerDevengado.dataset.id = String(lastSavedId);
+      btnVerDevengado.classList.remove("disabled");
+    }
+
+    panelBuscar?.hide?.();
+    alert("Suficiencia cargada correctamente.");
+  }
+
+  // ===========================
+  // ✅ RESULTADOS BUSCADOR (solo UNA versión)
+  // ===========================
+  function renderResultadosBusqueda(rows) {
+    console.log("[BUSCAR] resultados:", rows);
+
+    if (!rows || !rows.length) {
+      alert("No encontrada (o no corresponde a tu área).");
+      return;
+    }
+
+    if (rows.length === 1) {
+      const r = rows[0];
+      const folio =
+        r.no_suficiencia || String(r.folio_num || "").padStart(6, "0");
+      if (confirm(`¿Cargar suficiencia ${folio}?`)) {
+        cargarSuficienciaEnFormulario(r.id);
+      }
+      return;
+    }
+
+    const opciones = rows
+      .map((r, i) => {
+        const folio =
+          r.no_suficiencia || String(r.folio_num || "").padStart(6, "0");
+        const fecha = r.fecha ? String(r.fecha).split("T")[0] : "";
+        return `${i + 1}. Folio: ${folio} - Fecha: ${fecha}`;
+      })
+      .join("\n");
+
+    const seleccion = prompt(
+      `Se encontraron ${rows.length} suficiencias:\n\n${opciones}\n\nEscribe el número para cargar:`,
+    );
+
+    if (seleccion) {
+      const idx = parseInt(seleccion, 10) - 1;
+      if (idx >= 0 && idx < rows.length) {
+        cargarSuficienciaEnFormulario(rows[idx].id);
+      }
+    }
   }
 
   // ---------------------------
@@ -186,7 +353,7 @@
   }
 
   // ---------------------------
-  // (UI) Cantidad pago: SOLO lectura (se llena con TOTAL)
+  // Cantidad pago: SOLO lectura (se llena con TOTAL)
   // ---------------------------
   function lockCantidadPago() {
     const cantEl = document.querySelector('[name="cantidad_pago"]');
@@ -230,53 +397,48 @@
   }
 
   // =====================================================
-  // ✅ CANDADOS: (DG + DAUX) -> PROYECTOS permitidos
-  // Se valida por: "CLAVE|CONAC"  (ej: "0105020511|O")
+  // ✅ CANDADOS DG/DA -> PROYECTOS permitidos
   // =====================================================
   const DG_DA_PROYECTOS_FILTERS = {
+    // (tu mega objeto igualito al que pegaste)
     A00: {
-      "100": new Set(["0103010101|P", "0103010103|E"]),
-      "101": new Set(["0105020609|M", "0105020508|P"]),
-      "122": new Set(["0108040101|E"]),
-      "155": new Set(["0108010101|E"]),
-      "172": new Set(["0206080502|S", "0301020301|E", "0301020302|S"]),
-      "169": new Set(["0202020101|S"]),
-      "137": new Set(["0108030103|F"]),
+      100: new Set(["0103010101|P", "0103010103|E"]),
+      101: new Set(["0105020609|M", "0105020508|P"]),
+      122: new Set(["0108040101|E"]),
+      155: new Set(["0108010101|E"]),
+      172: new Set(["0206080502|S", "0301020301|E", "0301020302|S"]),
+      169: new Set(["0202020101|S"]),
+      137: new Set(["0108030103|F"]),
     },
-    A01: { "103": new Set(["0108030103|F"]) },
-    A02: { "102": new Set(["0102040102|E", "0102040103|E"]) },
-
-    B01: { "110": new Set(["0202020102|M"]) },
-    B02: { "110": new Set(["0202020102|M"]) },
-
-    C01: { "110": new Set(["0202020102|M"]) },
-    C02: { "110": new Set(["0202020102|M"]) },
-    C03: { "110": new Set(["0202020102|M"]) },
-    C04: { "110": new Set(["0202020102|M"]) },
-    C05: { "110": new Set(["0202020102|M"]) },
-    C06: { "110": new Set(["0202020102|M"]) },
-    C07: { "110": new Set(["0202020102|M"]) },
-    C08: { "110": new Set(["0202020102|M"]) },
-    C09: { "110": new Set(["0202020102|M"]) },
-    C10: { "110": new Set(["0202020102|M"]) },
-    C11: { "110": new Set(["0202020102|M"]) },
-    C12: { "110": new Set(["0202020102|M"]) },
-
+    A01: { 103: new Set(["0108030103|F"]) },
+    A02: { 102: new Set(["0102040102|E", "0102040103|E"]) },
+    B01: { 110: new Set(["0202020102|M"]) },
+    B02: { 110: new Set(["0202020102|M"]) },
+    C01: { 110: new Set(["0202020102|M"]) },
+    C02: { 110: new Set(["0202020102|M"]) },
+    C03: { 110: new Set(["0202020102|M"]) },
+    C04: { 110: new Set(["0202020102|M"]) },
+    C05: { 110: new Set(["0202020102|M"]) },
+    C06: { 110: new Set(["0202020102|M"]) },
+    C07: { 110: new Set(["0202020102|M"]) },
+    C08: { 110: new Set(["0202020102|M"]) },
+    C09: { 110: new Set(["0202020102|M"]) },
+    C10: { 110: new Set(["0202020102|M"]) },
+    C11: { 110: new Set(["0202020102|M"]) },
+    C12: { 110: new Set(["0202020102|M"]) },
     D00: {
-      "155": new Set(["0103090201|M"]),
-      "114": new Set(["0105020606|M"]),
-      "108": new Set(["0103090301|L"]),
-      "109": new Set(["0108010102|E"]),
+      155: new Set(["0103090201|M"]),
+      114: new Set(["0105020606|M"]),
+      108: new Set(["0103090301|L"]),
+      109: new Set(["0108010102|E"]),
     },
-
     E00: {
-      "120": new Set(["0105020105|E", "0105020601|P", "0105020602|M"]),
-      "121": new Set(["0105020603|M"]),
-      "114": new Set(["0105020606|M"]),
+      120: new Set(["0105020105|E", "0105020601|P", "0105020602|M"]),
+      121: new Set(["0105020603|M"]),
+      114: new Set(["0105020606|M"]),
     },
-
     F00: {
-      "123": new Set([
+      123: new Set([
         "0103080104|P",
         "0103080107|M",
         "0202010106|K",
@@ -284,18 +446,16 @@
         "0108010301|E",
       ]),
     },
-
     F01: {
-      "154": new Set([
+      154: new Set([
         "0202010111|K",
         "0107010108|E",
         "0305010111|E",
         "0105020602|M",
       ]),
     },
-
     G00: {
-      "160": new Set([
+      160: new Set([
         "0201040109|V",
         "0201050101|F",
         "0201050102|V",
@@ -303,23 +463,19 @@
         "0302020105|V",
       ]),
     },
-
     H00: {
-      "125": new Set(["0202010110|K", "0201010101|V"]),
-      "126": new Set(["0201010102|E"]),
-      "127": new Set(["0303050103|E", "0303050104|E"]),
-      "128": new Set(["0202060103|E"]),
-      "145": new Set(["0202060104|E"]),
-      "147": new Set(["0202060106|E"]),
+      125: new Set(["0202010110|K", "0201010101|V"]),
+      126: new Set(["0201010102|E"]),
+      127: new Set(["0303050103|E", "0303050104|E"]),
+      128: new Set(["0202060103|E"]),
+      145: new Set(["0202060104|E"]),
+      147: new Set(["0202060106|E"]),
     },
-
-    I00: { "143": new Set(["0206080602|E", "0206080603|E", "0206080604|E"]) },
-
-    I01: { "112": new Set(["0202020101|S", "0202020102|M"]) },
-
+    I00: { 143: new Set(["0206080602|E", "0206080603|E", "0206080604|E"]) },
+    I01: { 112: new Set(["0202020101|S", "0202020102|M"]) },
     I02: {
-      "129": new Set(["0201050201|E", "0201050202|E", "0201050203|E"]),
-      "153": new Set([
+      129: new Set(["0201050201|E", "0201050202|E", "0201050203|E"]),
+      153: new Set([
         "0203010108|E",
         "0203020115|S",
         "0206080502|S",
@@ -327,84 +483,75 @@
         "0206080504|E",
       ]),
     },
-
     J00: {
-      "102": new Set(["0102040102|E"]),
-      "111": new Set(["0204040102|E"]),
-      "112": new Set(["0108010101|E"]),
-      "144": new Set(["0103020104|E"]),
-      "151": new Set(["0206070101|P"]),
+      102: new Set(["0102040102|E"]),
+      111: new Set(["0204040102|E"]),
+      112: new Set(["0108010101|E"]),
+      144: new Set(["0103020104|E"]),
+      151: new Set(["0206070101|P"]),
     },
-
     K00: {
-      "134": new Set(["0103040101|O"]),
-      "135": new Set(["0103040101|O"]),
-      "136": new Set(["0103040201|O"]),
-      "138": new Set(["0103040202|O", "0103040203|O", "0103040205|O"]),
-      "139": new Set(["0103040102|P"]),
+      134: new Set(["0103040101|O"]),
+      135: new Set(["0103040101|O"]),
+      136: new Set(["0103040201|O"]),
+      138: new Set(["0103040202|O", "0103040203|O", "0103040205|O"]),
+      139: new Set(["0103040102|P"]),
     },
-
     L00: {
-      "115": new Set(["0105020201|E", "0105020209|E", "0402010103|C"]),
-      "116": new Set([
+      115: new Set(["0105020201|E", "0105020209|E", "0402010103|C"]),
+      116: new Set([
         "0105020511|O",
         "0401010104|D",
         "0401010105|D",
         "0402010104|O",
         "0404010101|H",
       ]),
-      "117": new Set(["0105020510|O"]),
-      "118": new Set(["0108010201|E"]),
-      "119": new Set(["0105020304|K", "0105020508|P"]),
-      "137": new Set(["0108050103|E"]),
-      "155": new Set(["0103050104|L"]),
+      117: new Set(["0105020510|O"]),
+      118: new Set(["0108010201|E"]),
+      119: new Set(["0105020304|K", "0105020508|P"]),
+      137: new Set(["0108050103|E"]),
+      155: new Set(["0103050104|L"]),
     },
-
-    M00: { "155": new Set(["0103050104|L"]), "112": new Set(["0108010101|E"]) },
-
+    M00: { 155: new Set(["0103050104|L"]), 112: new Set(["0108010101|E"]) },
     N00: {
-      "131": new Set(["0304020102|F"]),
-      "133": new Set(["0309030104|F"]),
-      "137": new Set(["0105020608|O"]),
-      "140": new Set(["0301020106|M", "0301020107|E"]),
-      "149": new Set(["0307010101|F"]),
+      131: new Set(["0304020102|F"]),
+      133: new Set(["0309030104|F"]),
+      137: new Set(["0105020608|O"]),
+      140: new Set(["0301020106|M", "0301020107|E"]),
+      149: new Set(["0307010101|F"]),
     },
-
     O00: {
-      "141": new Set([
+      141: new Set([
         "0205010110|S",
         "0205020105|S",
         "0205030105|S",
         "0205050101|S",
         "0205050102|S",
       ]),
-      "150": new Set(["0103030101|E", "0204020101|F"]),
+      150: new Set(["0103030101|E", "0204020101|F"]),
     },
-
     Q00: {
-      "104": new Set([
+      104: new Set([
         "0107010101|E",
         "0107010102|M",
         "0107010103|P",
         "0107010105|E",
         "0107040101|S",
       ]),
-      "158": new Set(["0107010108|E"]),
+      158: new Set(["0107010108|E"]),
     },
-
     T00: {
-      "105": new Set([
+      105: new Set([
         "0107020101|E",
         "0107020103|M",
         "0107020104|E",
         "0107020105|N",
         "0107020106|N",
       ]),
-      "106": new Set(["0107020102|N", "0302020105|V"]),
+      106: new Set(["0107020102|N", "0302020105|V"]),
     },
-
     V00: {
-      "152": new Set([
+      152: new Set([
         "0107010102|M",
         "0206080501|E",
         "0206080502|S",
@@ -412,9 +559,8 @@
         "0301020301|E",
       ]),
     },
-
     X00: {
-      "124": new Set([
+      124: new Set([
         "0201030101|K",
         "0202010109|K",
         "0202010110|K",
@@ -427,14 +573,16 @@
   };
 
   function _norm(v) {
-    return String(v || "").trim().toUpperCase();
+    return String(v || "")
+      .trim()
+      .toUpperCase();
   }
   function _normNum(v) {
     return String(v || "").trim();
   }
 
-  // null => no hay reglas para ese DG (no candado)
-  // Set vacío => DG sí existe pero DA no (candado estricto => sin proyectos)
+  // null => no hay reglas para ese DG (sin candado)
+  // Set vacío => DG existe pero DA no (candado estricto => sin proyectos)
   function getAllowedProyectoSet() {
     const dg = _norm(dgeneralInfo?.clave);
     const da = _normNum(dauxiliarInfo?.clave);
@@ -452,7 +600,7 @@
     if (!sel) return;
 
     const all = Object.values(proyectosById || {});
-    if (!all.length) return; // aún no carga nada
+    if (!all.length) return;
 
     const allowed = getAllowedProyectoSet();
     const current = sel.value || "";
@@ -461,7 +609,9 @@
       allowed === null
         ? all
         : all.filter((p) => {
-            let clave = String(p?.clave ?? "").trim().replace(/[^\d]/g, "");
+            let clave = String(p?.clave ?? "")
+              .trim()
+              .replace(/[^\d]/g, "");
             if (clave) clave = clave.padStart(10, "0");
             const conac = _norm(p?.conac);
             return allowed.has(`${clave}|${conac}`);
@@ -486,11 +636,8 @@
       sel.value = "";
     }
 
-    // al cambiar proyectos disponibles, resetea meta
-    setVal("id_meta", "");
-    setVal("meta", "");
-
     updateClaveProgramatica();
+    syncMetaFromProyecto();
   }
 
   // ---------------------------
@@ -508,27 +655,34 @@
     setVal("id_dauxiliar", idDa ?? "");
 
     const [dgCatalog, daCatalog] = await Promise.all([
-      fetchJson(`${API}/api/catalogos/dgeneral`, { headers: { ...authHeaders() } }),
-      fetchJson(`${API}/api/catalogos/dauxiliar`, { headers: { ...authHeaders() } }),
+      fetchJson(`${API}/api/catalogos/dgeneral`, {
+        headers: { ...authHeaders() },
+      }),
+      fetchJson(`${API}/api/catalogos/dauxiliar`, {
+        headers: { ...authHeaders() },
+      }),
     ]);
 
     dgeneralInfo = (dgCatalog || []).find((x) => Number(x.id) === idDg) || null;
-    dauxiliarInfo = (daCatalog || []).find((x) => Number(x.id) === idDa) || null;
+    dauxiliarInfo =
+      (daCatalog || []).find((x) => Number(x.id) === idDa) || null;
 
-    const depGenNombre = dgeneralInfo?.dependencia || user?.dgeneral_nombre || "";
-    const depAuxNombre = dauxiliarInfo?.dependencia || user?.dauxiliar_nombre || "";
+    const depGenNombre =
+      dgeneralInfo?.dependencia || user?.dgeneral_nombre || "";
+    const depAuxNombre =
+      dauxiliarInfo?.dependencia || user?.dauxiliar_nombre || "";
 
     setVal("dependencia", depGenNombre);
     setVal("dependencia_aux", depAuxNombre);
 
     updateClaveProgramatica();
 
-    // ✅ si proyectos ya cargaron, reaplica filtros
+    // si proyectos ya cargaron, reaplica filtros
     if (Object.keys(proyectosById || {}).length) applyProyectoFilters();
   }
 
   // ---------------------------
-  // Proyectos desde catálogo (CLAVE + CONAC + DESCRIPCIÓN)
+  // Proyectos desde catálogo
   // ---------------------------
   async function loadProyectosCatalog() {
     const data = await fetchJson(`${API}/api/catalogos/proyectos`, {
@@ -542,7 +696,6 @@
       let clave = String(claveRaw ?? "").trim();
       let conac = String(conacRaw ?? "").trim();
 
-      // Caso: "0108050103 E" en clave y conac vacío
       const parts = clave.split(/\s+/).filter(Boolean);
       if (!conac && parts.length >= 2) {
         const last = parts[parts.length - 1];
@@ -552,14 +705,11 @@
         }
       }
 
-      // Limpia a solo dígitos
       clave = clave.replace(/[^\d]/g, "");
-
-      // ✅ NORMALIZA A 10 DÍGITOS
       if (clave) clave = clave.padStart(10, "0");
-
-      // Normaliza conac
-      conac = String(conac || "").trim().toUpperCase();
+      conac = String(conac || "")
+        .trim()
+        .toUpperCase();
 
       return { clave, conac };
     };
@@ -604,7 +754,8 @@
       "fuente",
       data,
       (x) => x.id,
-      (x) => `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`
+      (x) =>
+        `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`,
     );
   }
 
@@ -637,71 +788,20 @@
     if (descEl) descEl.textContent = p?.descripcion || "—";
   }
 
-  // =====================================================
-  // ✅ METAS: cargar por combinación DG + DA + PROY + CONAC
-  // =====================================================
-  async function loadMetasForCurrentSelection() {
-    const selMeta = document.querySelector('[name="id_meta"]');
-    if (!selMeta) return;
-
-    // limpia
-    selMeta.innerHTML = `<option value="">-- Selecciona una meta --</option>`;
-    setVal("meta", ""); // ✅ limpia el texto también
-
-    // datos necesarios
-    const dg = String(dgeneralInfo?.clave || "").trim();
-    const da = String(dauxiliarInfo?.clave || "").trim();
-
+  // ✅ META: readonly y toma la DESCRIPCIÓN del proyecto (NO la clave)
+  function syncMetaFromProyecto() {
     const idProyecto = Number(get("id_proyecto") || 0);
     const p = proyectosById[idProyecto];
+    const metaText = p?.descripcion ? String(p.descripcion).trim() : "";
 
-    const proy_clave = String(p?.clave || "").trim();
-    const conac = String(p?.conac || "").trim();
+    setVal("meta", metaText);
 
-    // si falta algo, no consultes
-    if (!dg || !da || !proy_clave || !conac) return;
-
-    const qs = new URLSearchParams({
-      dg_clave: dg,
-      da_clave: da,
-      proy_clave,
-      conac,
-    });
-
-    const url = `${API}/api/catalogos/metas?${qs.toString()}`;
-
-    let data;
-    try {
-      data = await fetchJson(url, { headers: { ...authHeaders() } });
-    } catch (e) {
-      console.warn("[META] no se pudo cargar metas:", e.message);
-      return;
+    // si existe un select de meta en tu HTML, lo dejamos deshabilitado para evitar captura
+    const selMeta = document.querySelector('[name="id_meta"]');
+    if (selMeta) {
+      selMeta.disabled = true;
+      selMeta.value = ""; // no se usa
     }
-
-    const rows = Array.isArray(data) ? data : (data?.data || []);
-    if (!rows.length) return;
-
-    for (const r of rows) {
-      const texto = String(r.meta || r.descripcion || "").trim();
-      if (!texto) continue;
-
-      const opt = document.createElement("option");
-      opt.value = r.id != null ? String(r.id) : texto;
-      opt.textContent = texto;
-      selMeta.appendChild(opt);
-    }
-  }
-
-  // ✅ Opción A: al cambiar id_meta, guarda el texto en hidden meta
-  function bindMetaToHidden() {
-    const sel = document.querySelector('[name="id_meta"]');
-    if (!sel) return;
-
-    sel.addEventListener("change", () => {
-      const txt = sel.selectedOptions?.[0]?.textContent?.trim() || "";
-      // si está en placeholder, no guardes texto
-      setVal("meta", sel.value ? txt : "");
-    });
   }
 
   // ---------------------------
@@ -766,7 +866,9 @@
   }
 
   function renumberRows() {
-    const rows = detalleBody ? Array.from(detalleBody.querySelectorAll("tr")) : [];
+    const rows = detalleBody
+      ? Array.from(detalleBody.querySelectorAll("tr"))
+      : [];
     rows.forEach((tr, idx) => {
       const i = idx + 1;
       tr.setAttribute("data-row", String(i));
@@ -832,22 +934,15 @@
     return (detalle || []).reduce((acc, r) => acc + safeNumber(r?.importe), 0);
   }
 
-  function getImpuestosSeleccionados() {
-  const iva = !!document.querySelector('[name="imp_iva"]')?.checked;
-  const isr = !!document.querySelector('[name="imp_isr"]')?.checked;
-  const ieps = !!document.querySelector('[name="imp_ieps"]')?.checked;
-  return { iva, isr, ieps };
-}
-
-function useIVA() {
-  return !!document.querySelector('[name="imp_iva"]')?.checked;
-}
-function useISR() {
-  return !!document.querySelector('[name="imp_isr"]')?.checked;
-}
-function useIEPS() {
-  return !!document.querySelector('[name="imp_ieps"]')?.checked;
-}
+  function useIVA() {
+    return !!document.querySelector('[name="imp_iva"]')?.checked;
+  }
+  function useISR() {
+    return !!document.querySelector('[name="imp_isr"]')?.checked;
+  }
+  function useIEPS() {
+    return !!document.querySelector('[name="imp_ieps"]')?.checked;
+  }
 
   function getIsrPercent() {
     const el = document.querySelector('[name="isr_tasa"]');
@@ -875,33 +970,41 @@ function useIEPS() {
     return getIepsPercent() / 100;
   }
 
+  // ✅ FIX: ya existe y coincide con checkboxes
+  function getImpuestoTipo() {
+    const iva = useIVA();
+    const isr = useISR();
+    const ieps = useIEPS();
+
+    if (!iva && !isr && !ieps) return "NONE";
+    if (iva && !isr && !ieps) return "IVA";
+    if (!iva && isr && !ieps) return "ISR";
+    if (!iva && !isr && ieps) return "IEPS";
+    return "MIXTO";
+  }
+
   function refreshTotales() {
-  const detalle = buildDetalle();
-  const subtotal = calcSubtotal(detalle);
+    const detalle = buildDetalle();
+    const subtotal = calcSubtotal(detalle);
 
-  let iva = 0;
-  let isr = 0;
-  let ieps = 0;
+    let iva = 0;
+    let isr = 0;
+    let ieps = 0;
 
-  // ✅ IVA fijo 16%
-  if (useIVA()) iva = subtotal * 0.16;
+    if (useIVA()) iva = subtotal * 0.16;
+    if (useISR()) isr = subtotal * getIsrRate();
+    if (useIEPS()) ieps = subtotal * getIepsRate();
 
-  // ✅ ISR e IEPS editables
-  if (useISR()) isr = subtotal * getIsrRate();
-  if (useIEPS()) ieps = subtotal * getIepsRate();
+    const total = subtotal + iva + isr + ieps;
 
-  const total = subtotal + iva + isr + ieps;
-
-  setVal("subtotal", subtotal.toFixed(2));
-  setVal("iva", iva.toFixed(2));
-  setVal("isr", isr.toFixed(2));
-  setVal("ieps", ieps.toFixed(2));
-  setVal("total", total.toFixed(2));
-  setVal("cantidad_pago", total.toFixed(2));
-  setVal("cantidad_con_letra", numeroALetrasMX(total));
-}
-
-
+    setVal("subtotal", subtotal.toFixed(2));
+    setVal("iva", iva.toFixed(2));
+    setVal("isr", isr.toFixed(2));
+    setVal("ieps", ieps.toFixed(2));
+    setVal("total", total.toFixed(2));
+    setVal("cantidad_pago", total.toFixed(2));
+    setVal("cantidad_con_letra", numeroALetrasMX(total));
+  }
 
   document.addEventListener("input", (e) => {
     if (e.target && e.target.classList.contains("sp-importe")) {
@@ -949,10 +1052,54 @@ function useIEPS() {
     if (num === 0) return "CERO";
     if (num < 0) return "MENOS " + numeroALetras(Math.abs(num));
 
-    const unidades = ["", "UNO", "DOS", "TRES", "CUATRO", "CINCO", "SEIS", "SIETE", "OCHO", "NUEVE"];
-    const decenas10 = ["DIEZ", "ONCE", "DOCE", "TRECE", "CATORCE", "QUINCE", "DIECISÉIS", "DIECISIETE", "DIECIOCHO", "DIECINUEVE"];
-    const decenas = ["", "", "VEINTE", "TREINTA", "CUARENTA", "CINCUENTA", "SESENTA", "SETENTA", "OCHENTA", "NOVENTA"];
-    const centenas = ["", "CIENTO", "DOSCIENTOS", "TRESCIENTOS", "CUATROCIENTOS", "QUINIENTOS", "SEISCIENTOS", "SETECIENTOS", "OCHOCIENTOS", "NOVECIENTOS"];
+    const unidades = [
+      "",
+      "UNO",
+      "DOS",
+      "TRES",
+      "CUATRO",
+      "CINCO",
+      "SEIS",
+      "SIETE",
+      "OCHO",
+      "NUEVE",
+    ];
+    const decenas10 = [
+      "DIEZ",
+      "ONCE",
+      "DOCE",
+      "TRECE",
+      "CATORCE",
+      "QUINCE",
+      "DIECISÉIS",
+      "DIECISIETE",
+      "DIECIOCHO",
+      "DIECINUEVE",
+    ];
+    const decenas = [
+      "",
+      "",
+      "VEINTE",
+      "TREINTA",
+      "CUARENTA",
+      "CINCUENTA",
+      "SESENTA",
+      "SETENTA",
+      "OCHENTA",
+      "NOVENTA",
+    ];
+    const centenas = [
+      "",
+      "CIENTO",
+      "DOSCIENTOS",
+      "TRESCIENTOS",
+      "CUATROCIENTOS",
+      "QUINIENTOS",
+      "SEISCIENTOS",
+      "SETECIENTOS",
+      "OCHOCIENTOS",
+      "NOVECIENTOS",
+    ];
 
     function seccion(n) {
       if (n === 0) return "";
@@ -966,7 +1113,10 @@ function useIEPS() {
 
       if (c) out += centenas[c] + " ";
       if (du >= 10 && du <= 19) return (out + decenas10[du - 10]).trim();
-      if (d === 2 && u !== 0) return (out + ("VEINTI" + unidades[u].toLowerCase())).toUpperCase().trim();
+      if (d === 2 && u !== 0)
+        return (out + ("VEINTI" + unidades[u].toLowerCase()))
+          .toUpperCase()
+          .trim();
 
       if (d) {
         out += decenas[d];
@@ -1005,50 +1155,49 @@ function useIEPS() {
   // Impuestos: eventos y reglas
   // ---------------------------
   function bindTaxEvents() {
-  const chkIVA  = document.querySelector('[name="imp_iva"]');
-  const chkISR  = document.querySelector('[name="imp_isr"]');
-  const chkIEPS = document.querySelector('[name="imp_ieps"]');
+    const chkIVA = document.querySelector('[name="imp_iva"]');
+    const chkISR = document.querySelector('[name="imp_isr"]');
+    const chkIEPS = document.querySelector('[name="imp_ieps"]');
 
-  const isrInput  = document.querySelector('[name="isr_tasa"]');
-  const iepsInput = document.querySelector('[name="ieps_tasa"]');
+    const isrInput = document.querySelector('[name="isr_tasa"]');
+    const iepsInput = document.querySelector('[name="ieps_tasa"]');
 
-  const sync = () => {
-    // IVA no tiene input, solo recalcula
-    if (isrInput) {
-      isrInput.disabled = !chkISR?.checked;
-      if (chkISR?.checked && !isrInput.value) isrInput.value = "10";
-    }
-    if (iepsInput) {
-      iepsInput.disabled = !chkIEPS?.checked;
-      if (chkIEPS?.checked && !iepsInput.value) iepsInput.value = "8";
-    }
-    refreshTotales();
-  };
+    const sync = () => {
+      if (isrInput) {
+        isrInput.disabled = !chkISR?.checked;
+        if (chkISR?.checked && !isrInput.value) isrInput.value = "10";
+      }
+      if (iepsInput) {
+        iepsInput.disabled = !chkIEPS?.checked;
+        if (chkIEPS?.checked && !iepsInput.value) iepsInput.value = "8";
+      }
+      refreshTotales();
+    };
 
-  chkIVA?.addEventListener("change", sync);
-  chkISR?.addEventListener("change", sync);
-  chkIEPS?.addEventListener("change", sync);
+    chkIVA?.addEventListener("change", sync);
+    chkISR?.addEventListener("change", sync);
+    chkIEPS?.addEventListener("change", sync);
 
-  isrInput?.addEventListener("input", refreshTotales);
-  iepsInput?.addEventListener("input", refreshTotales);
+    isrInput?.addEventListener("input", refreshTotales);
+    iepsInput?.addEventListener("input", refreshTotales);
 
-  sync();
-}
-
-
+    sync();
+  }
 
   // =====================================================================
-  // ✅ Construir payload COMPLETO desde el FORM (para comprometido)
+  // ✅ Payload COMPLETO para pasar a comprometido
   // =====================================================================
   function buildSufPayloadFromForm(saved) {
-    const getL = (name) => document.querySelector(`[name="${name}"]`)?.value ?? "";
-
+    const getL = (name) =>
+      document.querySelector(`[name="${name}"]`)?.value ?? "";
     const getNum = (name) => {
       const x = Number(getL(name));
       return Number.isFinite(x) ? x : 0;
     };
 
-    const detalle = Array.from(document.querySelectorAll("#detalleBody tr")).map((tr) => {
+    const detalle = Array.from(
+      document.querySelectorAll("#detalleBody tr"),
+    ).map((tr) => {
       const inputs = tr.querySelectorAll("input");
 
       const clave = inputs[1]?.value ?? "";
@@ -1060,16 +1209,19 @@ function useIEPS() {
       return { clave, concepto_partida, justificacion, descripcion, importe };
     });
 
-    const imp = document.querySelector('input[name="impuesto_tipo"]:checked')?.value || "NONE";
-
     return {
       id: saved?.id ?? saved?.id_suficiencia ?? null,
-      folio_num: saved?.folio_num ?? saved?.no_suficiencia ?? saved?.folio ?? null,
+      folio_num:
+        saved?.folio_num ?? saved?.no_suficiencia ?? saved?.folio ?? null,
 
       fecha: getL("fecha"),
       dependencia: getL("dependencia"),
       id_dgeneral: getL("id_dgeneral"),
+
+      // ✅ alineación: en DB se llama "departamento"
       dependencia_aux: getL("dependencia_aux"),
+      departamento: getL("dependencia_aux"),
+
       id_dauxiliar: getL("id_dauxiliar"),
 
       id_proyecto: getL("id_proyecto"),
@@ -1080,8 +1232,7 @@ function useIEPS() {
       mes_pago: getL("mes_pago"),
       cantidad_pago: getNum("cantidad_pago"),
 
-      // ✅ Opción A
-      id_meta: getL("id_meta"),
+      // ✅ META = nombre del proyecto (readonly)
       meta: getL("meta"),
 
       subtotal: getNum("subtotal"),
@@ -1091,7 +1242,7 @@ function useIEPS() {
       total: getNum("total"),
       cantidad_con_letra: getL("cantidad_con_letra"),
 
-      impuesto_tipo: imp,
+      impuesto_tipo: getImpuestoTipo(),
       isr_tasa: getL("isr_tasa"),
       ieps_tasa: getL("ieps_tasa"),
 
@@ -1107,7 +1258,7 @@ function useIEPS() {
         payload,
         loaded_from: "local",
         loaded_at: new Date().toISOString(),
-      })
+      }),
     );
   }
 
@@ -1122,11 +1273,15 @@ function useIEPS() {
     const id_fuente = get("fuente") ? Number(get("fuente")) : null;
 
     const fuenteText =
-      document.querySelector('[name="fuente"]')?.selectedOptions?.[0]?.textContent?.trim() || "";
+      document
+        .querySelector('[name="fuente"]')
+        ?.selectedOptions?.[0]?.textContent?.trim() || "";
 
-    // ✅ Opción A: id_meta + meta
-    const id_meta = get("id_meta") ? Number(get("id_meta")) : null;
+    // ✅ meta readonly = descripción del proyecto
     const meta = get("meta") || null;
+
+    // ✅ alineación: tu DB usa "departamento"
+    const departamento = get("dependencia_aux") || null;
 
     return {
       id_usuario,
@@ -1136,16 +1291,19 @@ function useIEPS() {
       id_proyecto,
       id_fuente,
 
-      // ✅ agrega id_meta al backend
-      id_meta,
-      meta,
-
       no_suficiencia: null,
       fecha: get("fecha") || null,
       dependencia: get("dependencia") || null,
-      mes_pago: get("mes_pago") || null,
 
+      // ✅ se guarda en columna departamento
+      departamento,
+
+      fuente: fuenteText,
+      mes_pago: get("mes_pago") || null,
       clave_programatica: get("clave_programatica") || null,
+
+      // ✅ meta
+      meta,
 
       impuesto_tipo: getImpuestoTipo(),
       isr_tasa: get("isr_tasa") || null,
@@ -1156,7 +1314,6 @@ function useIEPS() {
       ieps: safeNumber(get("ieps")),
       total: safeNumber(get("total")),
       cantidad_con_letra: get("cantidad_con_letra") || "",
-      fuente: fuenteText,
 
       detalle: buildDetalle(),
     };
@@ -1168,7 +1325,9 @@ function useIEPS() {
     const payloadBackend = buildPayload();
 
     if (!payloadBackend.id_usuario) {
-      throw new Error("No se detectó el usuario logueado (cp_usuario). Vuelve a iniciar sesión.");
+      throw new Error(
+        "No se detectó el usuario logueado (cp_usuario). Vuelve a iniciar sesión.",
+      );
     }
     if (!payloadBackend.id_proyecto) {
       throw new Error("Selecciona un PROYECTO antes de guardar.");
@@ -1176,8 +1335,6 @@ function useIEPS() {
     if (!payloadBackend.id_fuente) {
       throw new Error("Selecciona una FUENTE antes de guardar.");
     }
-    // (opcional) si quieres obligar meta:
-    // if (!payloadBackend.id_meta) throw new Error("Selecciona una META antes de guardar.");
 
     const saved = await fetchJson(`${API}/api/suficiencias`, {
       method: "POST",
@@ -1188,22 +1345,30 @@ function useIEPS() {
       body: JSON.stringify(payloadBackend),
     });
 
-    if (!saved?.id) throw new Error("El servidor no devolvió el ID del registro.");
+    if (!saved || !saved.id) {
+      throw new Error("El servidor no devolvió el ID del registro.");
+    }
 
-    lastSavedId = saved.id;
+    lastSavedId = Number(saved.id);
 
-    if (saved?.no_suficiencia) {
+    if (saved.no_suficiencia) {
       setVal("no_suficiencia", String(saved.no_suficiencia));
-    } else if (saved?.folio_num != null) {
+    } else if (saved.folio_num != null) {
       setVal("no_suficiencia", String(saved.folio_num).padStart(6, "0"));
     }
 
-    try {
-      const payloadCompleto = buildSufPayloadFromForm(saved);
-      saveCpLastSuf(payloadCompleto);
-    } catch (e) {
-      console.warn("[SP] No se pudo guardar cp_last_suficiencia completo:", e);
-    }
+    // ✅ construir payload COMPLETO (con detalle) y guardarlo para Comprometido/Devengado
+    const payloadCompleto = buildSufPayloadFromForm(saved);
+
+    localStorage.setItem(
+      "cp_last_suficiencia",
+      JSON.stringify({
+        id: lastSavedId,
+        payload: payloadCompleto,
+        loaded_from: "save",
+        loaded_at: new Date().toISOString(),
+      }),
+    );
 
     if (btnVerComprometido) {
       btnVerComprometido.disabled = false;
@@ -1247,7 +1412,10 @@ function useIEPS() {
   // ---------------------------
   async function fetchPdfTemplateBytesSuf() {
     const r = await fetch(SUF_PDF_TEMPLATE_URL);
-    if (!r.ok) throw new Error(`No se pudo cargar la plantilla PDF: ${SUF_PDF_TEMPLATE_URL}`);
+    if (!r.ok)
+      throw new Error(
+        `No se pudo cargar la plantilla PDF: ${SUF_PDF_TEMPLATE_URL}`,
+      );
     return await r.arrayBuffer();
   }
 
@@ -1255,14 +1423,19 @@ function useIEPS() {
     const bytes = await fetchPdfTemplateBytesSuf();
     const pdfDoc = await PDFLib.PDFDocument.load(bytes);
     const form = pdfDoc.getForm();
-    console.log("[PDF] Campos:", form.getFields().map((f) => f.getName()));
+    console.log(
+      "[PDF] Campos:",
+      form.getFields().map((f) => f.getName()),
+    );
   }
 
   async function generarPDF() {
     refreshTotales();
 
     if (!window.PDFLib?.PDFDocument) {
-      throw new Error("Falta pdf-lib. Revisa que el script de pdf-lib cargue antes.");
+      throw new Error(
+        "Falta pdf-lib. Revisa que el script de pdf-lib cargue antes.",
+      );
     }
 
     const fuenteSel = document.querySelector('[name="fuente"]');
@@ -1280,7 +1453,7 @@ function useIEPS() {
       total: get("total"),
       cantidad_con_letra: get("cantidad_con_letra"),
 
-      // ✅ Opción A: PDF usa el TEXTO
+      // ✅ meta = nombre del proyecto
       meta: get("meta"),
 
       clave_programatica: get("clave_programatica"),
@@ -1305,15 +1478,22 @@ function useIEPS() {
     };
 
     function splitFechaParts(iso) {
-      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return { d: "", m: "", y: "" };
+      if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso))
+        return { d: "", m: "", y: "" };
       const [y, m, d] = iso.split("-");
       return { d, m, y };
     }
 
     // CABECERA
     setTextSafe("NOMBRE DE LA DEPENDENCIA GENERAL:", payload.dependencia || "");
-    setTextSafe("CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
-    setTextSafe("NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:", payload.clave_programatica || "");
+    setTextSafe(
+      "CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
+      payload.clave_programatica || "",
+    );
+    setTextSafe(
+      "NOMBRE CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:",
+      payload.clave_programatica || "",
+    );
 
     setTextSafe("FUENTE DE FINANCIAMIENTO", String(payload.fuente_texto || ""));
     setTextSafe("NOMBRE F.F", String(payload.fuente_texto || ""));
@@ -1324,9 +1504,24 @@ function useIEPS() {
     setTextSafe("fechayear", y);
 
     // PROGRAMACIÓN DE PAGO
-    const mesSel = String(payload.mes_pago || "").trim().toUpperCase();
+    const mesSel = String(payload.mes_pago || "")
+      .trim()
+      .toUpperCase();
     const totalTxt = safeN(payload.total).toFixed(2);
-    const meses = ["ENERO","FEBRERO","MARZO","ABRIL","MAYO","JUNIO","JULIO","AGOSTO","SEPTIEMBRE","OCTUBRE","NOVIEMBRE","DICIEMBRE"];
+    const meses = [
+      "ENERO",
+      "FEBRERO",
+      "MARZO",
+      "ABRIL",
+      "MAYO",
+      "JUNIO",
+      "JULIO",
+      "AGOSTO",
+      "SEPTIEMBRE",
+      "OCTUBRE",
+      "NOVIEMBRE",
+      "DICIEMBRE",
+    ];
     for (const mes of meses) {
       setTextSafe(`${mes}PROGRAMACIÓN DE PAGO`, mes === mesSel ? totalTxt : "");
     }
@@ -1335,10 +1530,22 @@ function useIEPS() {
     const detalle = payload.detalle || [];
     setTextSafe("No", detalle.map((r) => r.renglon).join("\n"));
     setTextSafe("CLAVE", detalle.map((r) => r.clave || "").join("\n"));
-    setTextSafe("CONCEPTO DE PARTIDA", detalle.map((r) => r.concepto_partida || "").join("\n"));
-    setTextSafe("JUSTIFICACIÓN", detalle.map((r) => r.justificacion || "").join("\n"));
-    setTextSafe("DESCRIPCIÓN", detalle.map((r) => r.descripcion || "").join("\n"));
-    setTextSafe("IMPORTE", detalle.map((r) => safeN(r.importe).toFixed(2)).join("\n"));
+    setTextSafe(
+      "CONCEPTO DE PARTIDA",
+      detalle.map((r) => r.concepto_partida || "").join("\n"),
+    );
+    setTextSafe(
+      "JUSTIFICACIÓN",
+      detalle.map((r) => r.justificacion || "").join("\n"),
+    );
+    setTextSafe(
+      "DESCRIPCIÓN",
+      detalle.map((r) => r.descripcion || "").join("\n"),
+    );
+    setTextSafe(
+      "IMPORTE",
+      detalle.map((r) => safeN(r.importe).toFixed(2)).join("\n"),
+    );
 
     // TOTALES
     setTextSafe("subtotal", safeN(payload.subtotal).toFixed(2));
@@ -1410,43 +1617,50 @@ function useIEPS() {
     btnVerComprometido?.addEventListener("click", (e) => {
       e.preventDefault();
 
-      let id = btnVerComprometido.dataset.id ? Number(btnVerComprometido.dataset.id) : null;
+      let id = btnVerComprometido.dataset.id
+        ? Number(btnVerComprometido.dataset.id)
+        : null;
       if (!id && lastSavedId) id = Number(lastSavedId);
       if (!id) id = readLastIdFromLocalStorage();
 
-      if (!id) return alert("Primero guarda la Suficiencia para generar el Comprometido.");
+      if (!id)
+        return alert(
+          "Primero guarda la Suficiencia para generar el Comprometido.",
+        );
       goComprometido(id);
     });
 
     btnVerDevengado?.addEventListener("click", (e) => {
       e.preventDefault();
 
-      let id = btnVerDevengado.dataset.id ? Number(btnVerDevengado.dataset.id) : null;
+      let id = btnVerDevengado.dataset.id
+        ? Number(btnVerDevengado.dataset.id)
+        : null;
       if (!id && lastSavedId) id = Number(lastSavedId);
       if (!id) id = readLastIdFromLocalStorage();
 
-      if (!id) return alert("Primero guarda la Suficiencia para generar el Devengado.");
+      if (!id)
+        return alert(
+          "Primero guarda la Suficiencia para generar el Devengado.",
+        );
       goDevengado(id);
     });
 
-    // ✅ cuando cambie proyecto, actualiza clave + metas
-    document.querySelector('[name="id_proyecto"]')?.addEventListener("change", async () => {
-      updateClaveProgramatica();
-
-      // resetea meta antes de recargar
-      setVal("id_meta", "");
-      setVal("meta", "");
-
-      await loadMetasForCurrentSelection();
-    });
-
-    // ✅ Opción A: id_meta -> meta hidden
-    bindMetaToHidden();
+    // ✅ cuando cambie proyecto: clave + meta readonly
+    document
+      .querySelector('[name="id_proyecto"]')
+      ?.addEventListener("change", () => {
+        updateClaveProgramatica();
+        syncMetaFromProyecto();
+        refreshTotales();
+      });
 
     bindTaxEvents();
 
     if (DEBUG_PDF_FIELDS) {
-      debugListPdfFields().catch((err) => console.warn("[PDF debug] ", err.message));
+      debugListPdfFields().catch((err) =>
+        console.warn("[PDF debug] ", err.message),
+      );
     }
 
     // ✅ BUSCADOR
@@ -1463,7 +1677,8 @@ function useIEPS() {
     btnBuscarNumero?.addEventListener("click", async () => {
       try {
         const n = txtNumeroSuf?.value || "";
-        if (!String(n).trim()) return alert("Escribe el número de suficiencia.");
+        if (!String(n).trim())
+          return alert("Escribe el número de suficiencia.");
         await buscarPorNumero(n);
       } catch (err) {
         console.error("[BUSCAR] error:", err);
@@ -1472,7 +1687,9 @@ function useIEPS() {
     });
 
     btnBuscarClaves?.addEventListener("click", async () => {
-      alert("Búsqueda por Dep + Programática: pendiente (aún no está implementada en el backend). Usa búsqueda por número.");
+      alert(
+        "Búsqueda por Dep + Programática: pendiente (aún no implementada). Usa búsqueda por número.",
+      );
       // await buscarPorClaves(txtDepClave.value, txtProgClave.value);
     });
 
@@ -1500,10 +1717,18 @@ function useIEPS() {
     initRows();
     bindEvents();
 
-    try { await loadPartidasCatalog(); } catch (e) { console.warn("[SP] catálogo partidas:", e.message); }
-    try { await loadDependenciasFromUser(); } catch (e) { console.warn("[SP] dependencias:", e.message); }
+    try {
+      await loadPartidasCatalog();
+    } catch (e) {
+      console.warn("[SP] catálogo partidas:", e.message);
+    }
 
-    // ✅ cargar proyectos y aplicar candado
+    try {
+      await loadDependenciasFromUser();
+    } catch (e) {
+      console.warn("[SP] dependencias:", e.message);
+    }
+
     try {
       await loadProyectosCatalog();
       applyProyectoFilters();
@@ -1511,7 +1736,12 @@ function useIEPS() {
       console.warn("[SP] proyectos:", e.message);
     }
 
-    try { await loadFuentesCatalog(); bindFuenteToHidden(); } catch (e) { console.warn("[SP] fuentes:", e.message); }
+    try {
+      await loadFuentesCatalog();
+      bindFuenteToHidden();
+    } catch (e) {
+      console.warn("[SP] fuentes:", e.message);
+    }
 
     try {
       const lastId = readLastIdFromLocalStorage();
@@ -1529,7 +1759,7 @@ function useIEPS() {
 
     refreshTotales();
     updateClaveProgramatica();
-    await loadMetasForCurrentSelection();
+    syncMetaFromProyecto();
   }
 
   if (document.readyState === "loading") {
@@ -1537,4 +1767,4 @@ function useIEPS() {
   } else {
     init();
   }
-})());
+})();

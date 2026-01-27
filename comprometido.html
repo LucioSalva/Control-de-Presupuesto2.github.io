@@ -21,15 +21,6 @@
         <i class="bi bi-currency-dollar me-2"></i>Control Presupuestal
       </a>
 
-      <form id="nav-search" class="nav-search" autocomplete="off">
-        <button type="submit" class="nav-search__btn" aria-label="Buscar ID">
-          <i class="bi bi-search"></i>
-        </button>
-        <input id="proj-code" type="text" name="proj-code"
-          class="form-control form-control-sm nav-search__input"
-          aria-label="ID del proyecto" placeholder="ID Suficiencia (ej. 123)">
-      </form>
-
       <div class="logo-container">
         <img src="/public/img/ayuntamiento-de-ecatepec.png" alt="Ayuntamiento de Ecatepec" class="navbar-logo">
       </div>
@@ -47,12 +38,39 @@
   <nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm" style="min-height: 40px;">
     <div class="container-fluid">
       <ul class="navbar-nav me-auto mb-2 mb-lg-0" style="flex-direction: row;">
-        <li class="nav-item"><a class="nav-link" href="suficiencia_presupuestal.html"><i class="bi bi-file-earmark-text me-1"></i>Suficiencia Presupuestal</a></li>
-        <li class="nav-item"><a class="nav-link" href="projects.html"><i class="bi bi-diagram-3 me-1"></i>Proyectos</a></li>
-        <li class="nav-item"><a class="nav-link" href="index.html"><i class="bi bi-house me-1"></i>Presupuesto</a></li>
-        <li class="nav-item"><a class="nav-link active" href="comprometido.html"><i class="bi bi-lock me-1"></i>Comprometido</a></li>
-        <li class="nav-item"><a class="nav-link" href="devengado.html"><i class="bi bi-lock me-1"></i>Devengado</a></li>
+        <li class="nav-item">
+          <a class="nav-link" href="suficiencia_presupuestal.html">
+            <i class="bi bi-file-earmark-text me-1"></i>Suficiencia Presupuestal
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link active" href="comprometido.html">
+            <i class="bi bi-lock me-1"></i>Comprometido
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="devengado.html">
+            <i class="bi bi-check2-square me-1"></i>Devengado
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="projects.html">
+            <i class="bi bi-diagram-3 me-1"></i>Proyectos
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="index.html">
+            <i class="bi bi-house me-1"></i>Presupuesto
+          </a>
+        </li>
       </ul>
+      <!-- <button id="btn-export-xlsx" class="btn btn-outline-success btn-sm">
+        <i class="bi bi-file-earmark-excel me-1"></i>Exportar Excel
+      </button>
+
+      <button id="btn-reset" class="btn btn-outline-danger btn-sm">
+        <i class="bi bi-eraser me-1"></i>Reiniciar
+      </button> -->
     </div>
   </nav>
 
@@ -60,6 +78,12 @@
     <div class="d-flex gap-2 justify-content-start mt-3">
       <button id="btn-descargar-pdf" class="btn btn-outline-danger btn-sm">
         <i class="bi bi-file-earmark-pdf me-1"></i>Descargar PDF
+      </button>
+
+      <button id="btn-ver-devengado" type="button" class="btn btn-outline-primary btn-sm"
+        title="Generar / Ver Devengado">
+        <i class="bi bi-check-circle me-1"></i>
+        Ir a Devengado
       </button>
 
       <button id="btn-recargar" class="btn btn-secondary btn-sm">
@@ -111,13 +135,15 @@
       <tr>
         <th class="table-header">NOMBRE DE LA DEPENDENCIA GENERAL:</th>
         <td>
-          <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia" readonly>
+          <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia"
+            readonly>
           <input type="hidden" name="id_dgeneral">
         </td>
 
         <th class="table-header">NOMBRE DE LA DEPENDENCIA AUXILIAR:</th>
         <td>
-          <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia_aux" readonly>
+          <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="dependencia_aux"
+            readonly>
           <input type="hidden" name="id_dauxiliar">
         </td>
       </tr>
@@ -142,7 +168,8 @@
       <tr>
         <th class="table-header">CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:</th>
         <td>
-          <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="clave_programatica" readonly>
+          <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="clave_programatica"
+            readonly>
           <div class="small mt-1 text-muted" id="claveProgDesc">—</div>
         </td>
 
@@ -193,7 +220,8 @@
     <!-- META + TOTALES (MISMO) -->
     <table class="table table-bordered mb-2">
       <tr>
-        <th class="table-header align-middle text-center" style="width:15%; background-color: rgb(180, 180, 180);" rowspan="5">
+        <th class="table-header align-middle text-center" style="width:15%; background-color: rgb(180, 180, 180);"
+          rowspan="5">
           META:
         </th>
 
@@ -205,35 +233,40 @@
 
         <th class="table-header text-end" style="width:10%; background-color: rgb(180, 180, 180);">SUBTOTAL:</th>
         <td style="width:10%;">
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="subtotal" readonly>
+          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
+            name="subtotal" readonly>
         </td>
       </tr>
 
       <tr>
         <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">IVA:</th>
         <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="iva" readonly>
+          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="iva"
+            readonly>
         </td>
       </tr>
 
       <tr>
         <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">ISR:</th>
         <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="isr" readonly>
+          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="isr"
+            readonly>
         </td>
       </tr>
 
       <tr>
         <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">IEPS:</th>
         <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="ieps" readonly>
+          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="ieps"
+            readonly>
         </td>
       </tr>
 
       <tr>
         <th class="table-header text-end" style="background-color: rgb(180, 180, 180);">TOTAL:</th>
         <td>
-          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click" name="total" readonly>
+          <input type="text" class="form-control form-control-sm text-end ro as-text td-text input-no-click"
+            name="total" readonly>
         </td>
       </tr>
     </table>
@@ -254,8 +287,7 @@
           <label class="form-check-label">ISR</label>
         </div>
         <input type="number" class="form-control form-control-sm text-end" name="isr_tasa"
-          style="width:120px; flex: 0 0 120px;"
-          placeholder="Ej. 10 %" min="0" step="0.01" disabled />
+          style="width:120px; flex: 0 0 120px;" placeholder="Ej. 10 %" min="0" step="0.01" disabled />
       </div>
 
       <div class="d-flex align-items-center gap-2 flex-nowrap">
@@ -264,8 +296,7 @@
           <label class="form-check-label">IEPS</label>
         </div>
         <input type="number" class="form-control form-control-sm text-end" name="ieps_tasa"
-          style="width:120px; flex: 0 0 120px;"
-          placeholder="Ej. 8 %" min="0" step="0.01" disabled />
+          style="width:120px; flex: 0 0 120px;" placeholder="Ej. 8 %" min="0" step="0.01" disabled />
       </div>
     </div>
 
@@ -273,7 +304,8 @@
       <tr>
         <th class="table-header" style="width: 15%; background-color: rgb(180, 180, 180);">CANTIDAD CON LETRA:</th>
         <td style="width: 85%;">
-          <input type="text" class="form-control form-control-sm ro as-text td-text input-no-click" name="cantidad_con_letra" readonly>
+          <input type="text" class="form-control form-control-sm ro as-text td-text input-no-click"
+            name="cantidad_con_letra" readonly>
         </td>
       </tr>
     </table>
@@ -281,21 +313,29 @@
     <!-- Leyenda + firmas (igual) -->
     <div class="border p-2" style="font-size:11px; text-align:justify; background-color: rgb(180, 180, 180);">
       <p class="mb-2">
-        La presente suficiencia presupuestal únicamente acredita la disponibilidad de recursos en la(s) clave(s) indicada(s),
-        sin que ello implique autorización para realizar procesos de licitación, adjudicación, contratación, adquisición, pago
+        La presente suficiencia presupuestal únicamente acredita la disponibilidad de recursos en la(s) clave(s)
+        indicada(s),
+        sin que ello implique autorización para realizar procesos de licitación, adjudicación, contratación,
+        adquisición, pago
         o validación documental, los cuales son responsabilidad exclusiva del ÁREA SOLICITANTE.
       </p>
       <p class="mb-2">
-        Esta autorización se emite con base en el techo presupuestal aprobado para la unidad administrativa correspondiente,
-        siendo también responsabilidad del ÁREA SOLICITANTE la planeación, administración, verificación y comprobación del uso de los recursos.
+        Esta autorización se emite con base en el techo presupuestal aprobado para la unidad administrativa
+        correspondiente,
+        siendo también responsabilidad del ÁREA SOLICITANTE la planeación, administración, verificación y comprobación
+        del uso de los recursos.
       </p>
       <p class="mb-2">
-        El ejercicio del gasto deberá apegarse a lo establecido en el Clasificador por Objeto del Gasto Estatal y Municipal,
-        incluido en el Manual para la Planeación, Programación y Presupuesto de Egresos Municipal vigente, en los Lineamientos Generales
-        para la Evaluación de Programas Presupuestarios Municipales, y en la normatividad municipal, estatal y complementaria aplicable.
+        El ejercicio del gasto deberá apegarse a lo establecido en el Clasificador por Objeto del Gasto Estatal y
+        Municipal,
+        incluido en el Manual para la Planeación, Programación y Presupuesto de Egresos Municipal vigente, en los
+        Lineamientos Generales
+        para la Evaluación de Programas Presupuestarios Municipales, y en la normatividad municipal, estatal y
+        complementaria aplicable.
       </p>
       <p class="mb-0">
-        El recurso deberá ejercerse en el mismo mes de emisión de esta suficiencia; en caso contrario, perderá validez y deberá tramitarse nuevamente con fecha del mes en curso.
+        El recurso deberá ejercerse en el mismo mes de emisión de esta suficiencia; en caso contrario, perderá validez y
+        deberá tramitarse nuevamente con fecha del mes en curso.
       </p>
     </div>
 
