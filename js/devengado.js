@@ -63,6 +63,13 @@
     return el ? el.value : "";
   };
 
+  function setReadonlyVal(name, value) {
+    const el = document.querySelector(`[name="${name}"]`);
+    if (!el) return;
+    el.value = value ?? "";
+    el.readOnly = true;
+  }
+
   function safeNumber(n) {
     const x = Number(n);
     return Number.isFinite(x) ? x : 0;
@@ -134,6 +141,21 @@
     }
   }
 
+  // ✅ Catálogo fuentes (id -> "clave - fuente")
+  async function loadFuentesMap() {
+    const r = await fetch(`${API}/api/catalogos/fuentes`, {
+      headers: { ...authHeaders() },
+    });
+    if (!r.ok) return {};
+    const data = await r.json();
+    const map = {};
+    (data || []).forEach((x) => {
+      map[String(x.id)] =
+        `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`.trim();
+    });
+    return map;
+  }
+
   // ---------------------------
   // Vigencia / Cancelado
   // ---------------------------
@@ -190,7 +212,7 @@
       const i = idx + 1;
       const importe = safeNumber(r?.importe).toFixed(2);
       const importeOriginal = safeNumber(
-        r?.importe_comprometido ?? r?.importe_original ?? r?.importe
+        r?.importe_comprometido ?? r?.importe_original ?? r?.importe,
       ).toFixed(2);
 
       detalleBody.insertAdjacentHTML(
@@ -220,7 +242,7 @@
               value="${importe}">
           </td>
         </tr>
-      `
+      `,
       );
     });
 
@@ -283,52 +305,52 @@
   }
 
   // ---------------------------
-// Cargar data 
-// ---------------------------
-async function loadData() {
-  const id = getQueryId();
+  // Cargar data
+  // ---------------------------
+  async function loadData() {
+    const id = getQueryId();
 
-  // ✅ Si viene id en URL, ese id es del COMPROMETIDO
-  if (id) {
-    // 👇 OJO: tu API de comprometido normalmente regresa { ok:true, data:{...} }
-    const resp = await fetchJson(`${API}/api/comprometido/${id}`, {
-      headers: { ...authHeaders() },
-    });
+    // ✅ Si viene id en URL, ese id es del COMPROMETIDO
+    if (id) {
+      const resp = await fetchJson(`${API}/api/comprometido/${id}`, {
+        headers: { ...authHeaders() },
+      });
 
-    const payload = resp?.data || resp?.payload || resp;
-    if (!payload) throw new Error("No se encontró payload en /api/comprometido/:id");
+      const payload = resp?.data || resp?.payload || resp;
+      if (!payload)
+        throw new Error("No se encontró payload en /api/comprometido/:id");
 
-    // ✅ aseguramos que el payload traiga id_comprometido
-    payload.id_comprometido = Number(payload.id_comprometido || payload.id || id);
+      // ✅ aseguramos que el payload traiga id_comprometido
+      payload.id_comprometido = Number(payload.id_comprometido || payload.id || id);
 
-    // ✅ guarda para fallback
-    localStorage.setItem(
-      "cp_last_comprometido",
-      JSON.stringify({
-        id: String(payload.id_comprometido),
-        payload,
-        loaded_from: "api",
-        loaded_at: new Date().toISOString(),
-      })
-    );
+      // ✅ guarda para fallback
+      localStorage.setItem(
+        "cp_last_comprometido",
+        JSON.stringify({
+          id: String(payload.id_comprometido),
+          payload,
+          loaded_from: "api",
+          loaded_at: new Date().toISOString(),
+        }),
+      );
+
+      return payload;
+    }
+
+    // fallback localStorage
+    const raw = localStorage.getItem("cp_last_comprometido");
+    if (!raw) throw new Error("No hay datos. Abre devengado.html?id=ID");
+
+    const obj = JSON.parse(raw);
+    const payload = obj?.payload || obj;
+    if (!payload)
+      throw new Error("No se encontró payload válido en cp_last_comprometido.");
+
+    // ✅ asegúrate que exista id_comprometido
+    payload.id_comprometido = Number(payload.id_comprometido || obj?.id || 0);
 
     return payload;
   }
-
-  // fallback localStorage
-  const raw = localStorage.getItem("cp_last_comprometido");
-  if (!raw) throw new Error("No hay datos. Abre devengado.html?id=ID");
-
-  const obj = JSON.parse(raw);
-  const payload = obj?.payload || obj;
-  if (!payload) throw new Error("No se encontró payload válido en cp_last_comprometido.");
-
-  // ✅ asegúrate que exista id_comprometido
-  payload.id_comprometido = Number(payload.id_comprometido || obj?.id || 0);
-
-  return payload;
-}
-
 
   // ---------------------------
   // Firmas
@@ -348,7 +370,7 @@ async function loadData() {
   // ---------------------------
   // Render payload
   // ---------------------------
-  function renderPayload(payload) {
+  async function renderPayload(payload) {
     currentPayload = payload;
 
     // Folio devengado (texto)
@@ -358,7 +380,7 @@ async function loadData() {
         payload?.folio_oficial_devengado ||
         (payload?.folio_devengado
           ? String(payload.folio_devengado).padStart(6, "0")
-          : "NUEVO")
+          : "NUEVO"),
     );
 
     // Ref comprometido
@@ -368,7 +390,7 @@ async function loadData() {
         payload?.folio_oficial_comprometido ||
         (payload?.folio_comprometido
           ? String(payload.folio_comprometido).padStart(6, "0")
-          : "")
+          : ""),
     );
 
     // Generales
@@ -378,7 +400,7 @@ async function loadData() {
     const fecha = formatFecha(
       payload?.fecha_devengado ||
         payload?.fecha ||
-        new Date().toISOString().split("T")[0]
+        new Date().toISOString().split("T")[0],
     );
     setVal("fecha", fecha);
 
@@ -388,7 +410,29 @@ async function loadData() {
     setVal("id_proyecto_programatico", payload?.clave_programatica || "");
 
     setVal("programa", payload?.programa || "");
-    setVal("fuente", payload?.fuente || "");
+
+    // ================================
+    // ✅ FUENTE (mostrar "clave - fuente" aunque venga solo id)
+    // ================================
+    const idFuente =
+      payload?.id_fuente != null ? String(payload.id_fuente) : "";
+
+    // guarda id en hidden si existe
+    setReadonlyVal("id_fuente", idFuente);
+
+    // intenta tomar texto directo
+    let fuenteLabel = String(payload?.fuente_text || payload?.fuente || "").trim();
+
+    // si no hay texto pero sí id, resolver catálogo
+    if (!fuenteLabel && idFuente) {
+      if (!window.__fuentesMap) window.__fuentesMap = await loadFuentesMap();
+      fuenteLabel = window.__fuentesMap[idFuente] || "";
+    }
+
+    // pinta input visible (cualquiera que exista en tu HTML)
+    setReadonlyVal("fuente_text", fuenteLabel);
+    setReadonlyVal("fuente", fuenteLabel);
+
     setVal("mes_pago", payload?.mes_pago || "");
 
     // Monto comprometido
@@ -411,14 +455,14 @@ async function loadData() {
     const detNorm = det.map((d) => ({
       ...d,
       importe_comprometido: safeNumber(
-        d?.importe_comprometido ?? d?.importe_original ?? d?.importe
+        d?.importe_comprometido ?? d?.importe_original ?? d?.importe,
       ),
       importe: safeNumber(
         d?.importe ??
           d?.importe_devengado ??
           d?.importe_comprometido ??
           d?.importe_original ??
-          0
+          0,
       ),
     }));
 
@@ -439,7 +483,7 @@ async function loadData() {
   // Build payload para guardar
   // ---------------------------
   function buildSavePayload() {
-    const user = getUser(); // (no lo usa backend, pero lo dejamos)
+    getUser(); // (no lo usa backend, pero lo dejamos)
     const detalle = [];
 
     document.querySelectorAll("#detalleBody tr").forEach((tr, idx) => {
@@ -455,7 +499,7 @@ async function loadData() {
         importe_comprometido: safeNumber(
           original?.importe_comprometido ??
             original?.importe_original ??
-            original?.importe
+            original?.importe,
         ),
       });
     });
@@ -467,7 +511,9 @@ async function loadData() {
     const idComp = resolveIdComprometido();
 
     return {
-      id_suficiencia: Number(currentPayload?.id_suficiencia || currentPayload?.id || 0) || null,
+      id_suficiencia:
+        Number(currentPayload?.id_suficiencia || currentPayload?.id || 0) ||
+        null,
       id_comprometido: idComp > 0 ? idComp : null,
 
       fecha_devengado: getVal("fecha"),
@@ -476,7 +522,7 @@ async function loadData() {
       monto_devengado: montoDevengado,
       monto_liberado: montoLiberado > 0 ? montoLiberado : 0,
 
-      // firmas (si backend no las usa no pasa nada)
+      // firmas
       firmante_area: getVal("firma_area_nombre"),
       firmante_direccion: getVal("firma_direccion_nombre"),
       firmante_coordinacion: getVal("firma_suficiencia_nombre"),
@@ -521,7 +567,7 @@ async function loadData() {
           payload,
           result: data,
           saved_at: new Date().toISOString(),
-        })
+        }),
       );
     } catch {}
 
@@ -532,7 +578,6 @@ async function loadData() {
     const id = getQueryId();
     if (!id) throw new Error("No se puede cancelar: ID no encontrado");
 
-    // Nota: si tu backend NO tiene cancelar para devengado, esto dará 404.
     const data = await fetchJson(`${API}/api/devengado/${id}/cancelar`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
@@ -590,9 +635,9 @@ async function loadData() {
         const data = await guardarDevengado();
         modalGuardar.hide();
 
-        // Tu backend regresa { ok:true, id, folio_num, no_devengado } en el routes que me mandaste
         if (data?.no_devengado) setVal("no_devengado", data.no_devengado);
-        else if (data?.folio_num) setVal("no_devengado", String(data.folio_num).padStart(6, "0"));
+        else if (data?.folio_num)
+          setVal("no_devengado", String(data.folio_num).padStart(6, "0"));
 
         alert("Devengado guardado correctamente.");
       } catch (err) {
@@ -637,7 +682,7 @@ async function loadData() {
     btnRecargar?.addEventListener("click", async () => {
       try {
         const payload = await loadData();
-        renderPayload(payload);
+        await renderPayload(payload);
       } catch (err) {
         alert(err?.message || "No se pudo recargar");
       }
@@ -673,7 +718,7 @@ async function loadData() {
   async function init() {
     try {
       const payload = await loadData();
-      renderPayload(payload);
+      await renderPayload(payload);
     } catch (err) {
       console.error("[DEVENGADO]", err);
       alert(err?.message || "No se pudieron cargar datos");
