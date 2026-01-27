@@ -21,7 +21,7 @@
   let currentPayload = null;
   let montoComprometido = 0;
 
-  // Tasas (se preservan y NO se resetean)
+  // Tasas
   let tasaIVA = 0.16;
   let tasaISR = 0;
 
@@ -84,9 +84,11 @@
     const r = await fetch(url, options);
     const text = await r.text();
     let data = null;
+
     try {
       data = text ? JSON.parse(text) : null;
     } catch {}
+
     if (!r.ok) {
       const msg = data?.error || data?.message || `HTTP ${r.status} en ${url}`;
       throw new Error(msg);
@@ -98,6 +100,38 @@
     const u = new URL(window.location.href);
     const id = u.searchParams.get("id");
     return id ? String(id).trim() : "";
+  }
+
+  // ✅ Resolver robusto de id_comprometido:
+  // 1) URL ?id=
+  // 2) currentPayload.id_comprometido
+  // 3) localStorage cp_last_comprometido (id / payload.id_comprometido)
+  function resolveIdComprometido() {
+    const fromUrl = Number(getQueryId() || 0);
+    if (fromUrl > 0) return fromUrl;
+
+    const fromPayload = Number(currentPayload?.id_comprometido || 0);
+    if (fromPayload > 0) return fromPayload;
+
+    try {
+      const raw = localStorage.getItem("cp_last_comprometido");
+      if (!raw) return 0;
+      const obj = JSON.parse(raw);
+
+      const a = Number(obj?.id || 0);
+      if (a > 0) return a;
+
+      const b = Number(obj?.payload?.id_comprometido || 0);
+      if (b > 0) return b;
+
+      // por si guardaron payload.id como id_comprometido (fallback)
+      const c = Number(obj?.payload?.id || 0);
+      if (c > 0) return c;
+
+      return 0;
+    } catch {
+      return 0;
+    }
   }
 
   // ---------------------------
@@ -138,7 +172,7 @@
   }
 
   // ---------------------------
-  // Detalle (IMPORTES SIEMPRE editables si está vigente)
+  // Detalle
   // ---------------------------
   function renderDetalle(detalle = []) {
     if (!detalleBody) return;
@@ -156,7 +190,7 @@
       const i = idx + 1;
       const importe = safeNumber(r?.importe).toFixed(2);
       const importeOriginal = safeNumber(
-        r?.importe_comprometido ?? r?.importe_original ?? r?.importe,
+        r?.importe_comprometido ?? r?.importe_original ?? r?.importe
       ).toFixed(2);
 
       detalleBody.insertAdjacentHTML(
@@ -186,7 +220,7 @@
               value="${importe}">
           </td>
         </tr>
-      `,
+      `
       );
     });
 
@@ -249,46 +283,63 @@
   }
 
   // ---------------------------
-  // Cargar data (desde comprometido)
-  // ---------------------------
-  async function loadData() {
-    const id = getQueryId();
+// Cargar data 
+// ---------------------------
+async function loadData() {
+  const id = getQueryId();
 
-    // ✅ 1) Cargar desde endpoint correcto: /api/devengados/comprometido/:id
-    if (id) {
-      const data = await fetchJson(`${API}/api/devengados/comprometido/${id}`, {
-        headers: { ...authHeaders() },
-      });
-      return data?.payload || data;
-    }
+  // ✅ Si viene id en URL, ese id es del COMPROMETIDO
+  if (id) {
+    // 👇 OJO: tu API de comprometido normalmente regresa { ok:true, data:{...} }
+    const resp = await fetchJson(`${API}/api/comprometido/${id}`, {
+      headers: { ...authHeaders() },
+    });
 
-    // ✅ 2) fallback localStorage
-    const raw =
-      localStorage.getItem("cp_last_comprometido") ||
-      localStorage.getItem("cp_last_suficiencia");
+    const payload = resp?.data || resp?.payload || resp;
+    if (!payload) throw new Error("No se encontró payload en /api/comprometido/:id");
 
-    if (!raw) throw new Error("No hay datos. Abre devengado.html?id=ID");
+    // ✅ aseguramos que el payload traiga id_comprometido
+    payload.id_comprometido = Number(payload.id_comprometido || payload.id || id);
 
-    const obj = JSON.parse(raw);
-    const payload = obj?.payload || obj;
-    if (!payload) throw new Error("No se encontró payload válido.");
+    // ✅ guarda para fallback
+    localStorage.setItem(
+      "cp_last_comprometido",
+      JSON.stringify({
+        id: String(payload.id_comprometido),
+        payload,
+        loaded_from: "api",
+        loaded_at: new Date().toISOString(),
+      })
+    );
 
     return payload;
   }
 
+  // fallback localStorage
+  const raw = localStorage.getItem("cp_last_comprometido");
+  if (!raw) throw new Error("No hay datos. Abre devengado.html?id=ID");
+
+  const obj = JSON.parse(raw);
+  const payload = obj?.payload || obj;
+  if (!payload) throw new Error("No se encontró payload válido en cp_last_comprometido.");
+
+  // ✅ asegúrate que exista id_comprometido
+  payload.id_comprometido = Number(payload.id_comprometido || obj?.id || 0);
+
+  return payload;
+}
+
+
   // ---------------------------
-  // Firmas (3 editables + tesorero fijo)
-  // Guardamos NOMBRES en: firmante_area, firmante_direccion, firmante_coordinacion
+  // Firmas
   // ---------------------------
   function updateFirmasSection(payload) {
     const spanArea = document.getElementById("firmaAreaSolicitante");
     const spanDireccion = document.getElementById("firmaDireccionSolicitante");
 
-    // Área y Dirección (texto) — salen del documento
     if (spanArea) spanArea.textContent = payload?.dependencia_aux || "-";
     if (spanDireccion) spanDireccion.textContent = payload?.dependencia || "-";
 
-    // Nombres (editables)
     setVal("firma_area_nombre", payload?.firmante_area || "");
     setVal("firma_direccion_nombre", payload?.firmante_direccion || "");
     setVal("firma_suficiencia_nombre", payload?.firmante_coordinacion || "");
@@ -300,35 +351,42 @@
   function renderPayload(payload) {
     currentPayload = payload;
 
-    // Folio devengado
+    // Folio devengado (texto)
     setVal(
       "no_devengado",
-      payload?.folio_oficial_devengado ||
+      payload?.no_devengado ||
+        payload?.folio_oficial_devengado ||
         (payload?.folio_devengado
           ? String(payload.folio_devengado).padStart(6, "0")
-          : "NUEVO"),
+          : "NUEVO")
     );
 
     // Ref comprometido
     setVal(
       "no_comprometido",
-      payload?.folio_oficial_comprometido ||
+      payload?.no_comprometido ||
+        payload?.folio_oficial_comprometido ||
         (payload?.folio_comprometido
           ? String(payload.folio_comprometido).padStart(6, "0")
-          : payload?.no_comprometido || ""),
+          : "")
     );
 
     // Generales
     setVal("dependencia", payload?.dependencia || "");
-    setVal(
-      "fecha",
-      formatFecha(
-        payload?.fecha_devengado ||
-          payload?.fecha ||
-          new Date().toISOString().split("T")[0],
-      ),
+    setVal("dependencia_aux", payload?.dependencia_aux || "");
+
+    const fecha = formatFecha(
+      payload?.fecha_devengado ||
+        payload?.fecha ||
+        new Date().toISOString().split("T")[0]
     );
+    setVal("fecha", fecha);
+
+    // ✅ tu HTML usa name="clave_programatica"
+    setVal("clave_programatica", payload?.clave_programatica || "");
+    // ✅ por compatibilidad si existe otro input
     setVal("id_proyecto_programatico", payload?.clave_programatica || "");
+
     setVal("programa", payload?.programa || "");
     setVal("fuente", payload?.fuente || "");
     setVal("mes_pago", payload?.mes_pago || "");
@@ -338,44 +396,40 @@
     setVal("monto_comprometido", formatMoney(montoComprometido));
     setVal("cantidad_pago", safeNumber(payload?.total).toFixed(2));
 
-    // Tasas (preservadas)
+    // Tasas
     const isrTasaRaw = payload?.isr_tasa || payload?.isr_rate || 0;
     tasaISR = isrTasaRaw > 1 ? isrTasaRaw / 100 : isrTasaRaw;
+
     tasaIVA =
       payload?.iva_rate ||
       (payload?.iva && payload?.subtotal
         ? safeNumber(payload.iva) / safeNumber(payload.subtotal)
         : 0.16);
 
-    // Detalle (si existe importe_devengado, úsalo; si no, el comprometido)
+    // Detalle
     const det = Array.isArray(payload?.detalle) ? payload.detalle : [];
     const detNorm = det.map((d) => ({
       ...d,
-      // si el backend manda "importe_comprometido", úsalo como tope
       importe_comprometido: safeNumber(
-        d?.importe_comprometido ?? d?.importe_original ?? d?.importe,
+        d?.importe_comprometido ?? d?.importe_original ?? d?.importe
       ),
-      // importe actual (devengado)
       importe: safeNumber(
         d?.importe ??
           d?.importe_devengado ??
           d?.importe_comprometido ??
           d?.importe_original ??
-          0,
+          0
       ),
     }));
 
     renderDetalle(detNorm);
 
-    // Totales base y recalcular (para amarrar a los importes editados)
+    // Totales
     setVal("meta", payload?.meta || "");
     recalcularTotales();
 
     // Vigencia
-    verificarVigencia(
-      payload?.fecha_comprometido || payload?.fecha,
-      payload?.estatus,
-    );
+    verificarVigencia(payload?.fecha_comprometido || payload?.fecha, payload?.estatus);
 
     // Firmas
     updateFirmasSection(payload);
@@ -385,14 +439,12 @@
   // Build payload para guardar
   // ---------------------------
   function buildSavePayload() {
-    const user = getUser();
+    const user = getUser(); // (no lo usa backend, pero lo dejamos)
     const detalle = [];
 
     document.querySelectorAll("#detalleBody tr").forEach((tr, idx) => {
       const importeInput = tr.querySelector(`[name="importe_${idx}"]`);
       const original = currentPayload?.detalle?.[idx] || {};
-
-      // El renglón puede venir como no / renglon
       const renglon = original?.no || original?.renglon || idx + 1;
 
       detalle.push({
@@ -400,11 +452,10 @@
         no: renglon,
         renglon: renglon,
         importe: safeNumber(importeInput?.value),
-        // conservar comprometido como referencia
         importe_comprometido: safeNumber(
           original?.importe_comprometido ??
             original?.importe_original ??
-            original?.importe,
+            original?.importe
         ),
       });
     });
@@ -412,21 +463,20 @@
     const montoDevengado = safeNumber(getVal("total"));
     const montoLiberado = montoComprometido - montoDevengado;
 
+    // ✅ ID comprometido SIEMPRE (URL o localStorage)
+    const idComp = resolveIdComprometido();
+
     return {
-      id_comprometido: currentPayload?.id_comprometido || currentPayload?.id,
-      id_usuario_valida: user?.id ?? null,
+      id_suficiencia: Number(currentPayload?.id_suficiencia || currentPayload?.id || 0) || null,
+      id_comprometido: idComp > 0 ? idComp : null,
+
       fecha_devengado: getVal("fecha"),
 
       monto_comprometido: montoComprometido,
       monto_devengado: montoDevengado,
       monto_liberado: montoLiberado > 0 ? montoLiberado : 0,
 
-      dependencia: getVal("dependencia"),
-      clave_programatica: getVal("id_proyecto_programatico"),
-      mes_pago: getVal("mes_pago"),
-      meta: getVal("meta"),
-
-      // NOMBRES (variables) guardados en columnas existentes
+      // firmas (si backend no las usa no pasa nada)
       firmante_area: getVal("firma_area_nombre"),
       firmante_direccion: getVal("firma_direccion_nombre"),
       firmante_coordinacion: getVal("firma_suficiencia_nombre"),
@@ -434,7 +484,7 @@
       subtotal: safeNumber(getVal("subtotal")),
       iva: safeNumber(getVal("iva")),
       isr: safeNumber(getVal("isr")),
-      isr_tasa: tasaISR * 100, // guardar como porcentaje
+      isr_tasa: tasaISR * 100,
       total: safeNumber(getVal("total")),
       cantidad_con_letra: getVal("cantidad_con_letra"),
 
@@ -445,17 +495,35 @@
   async function guardarDevengado() {
     const payload = buildSavePayload();
 
-    if (payload.monto_devengado > payload.monto_comprometido) {
-      throw new Error(
-        "El monto a devengar no puede ser mayor al monto comprometido.",
-      );
+    if (!payload.id_comprometido || payload.id_comprometido <= 0) {
+      throw new Error("Falta id_comprometido válido");
+    }
+    if (!payload.id_suficiencia || payload.id_suficiencia <= 0) {
+      throw new Error("Falta id_suficiencia válido");
     }
 
-    const data = await fetchJson(`${API}/api/devengados`, {
+    if (payload.monto_devengado > payload.monto_comprometido) {
+      throw new Error("El monto a devengar no puede ser mayor al comprometido.");
+    }
+
+    const data = await fetchJson(`${API}/api/devengado`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(payload),
     });
+
+    // ✅ guarda el resultado para reusar
+    try {
+      localStorage.setItem(
+        "cp_last_devengado",
+        JSON.stringify({
+          id_comprometido: payload.id_comprometido,
+          payload,
+          result: data,
+          saved_at: new Date().toISOString(),
+        })
+      );
+    } catch {}
 
     return data;
   }
@@ -464,7 +532,8 @@
     const id = getQueryId();
     if (!id) throw new Error("No se puede cancelar: ID no encontrado");
 
-    const data = await fetchJson(`${API}/api/devengados/${id}/cancelar`, {
+    // Nota: si tu backend NO tiene cancelar para devengado, esto dará 404.
+    const data = await fetchJson(`${API}/api/devengado/${id}/cancelar`, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ motivo: "Cancelación manual por usuario" }),
@@ -474,7 +543,7 @@
   }
 
   // ---------------------------
-  // PDF (placeholder: usa el de Brenda si ya lo tienes)
+  // PDF (placeholder)
   // ---------------------------
   async function generarPDF() {
     alert("Conecta aquí tu generador real de PDF (pdf-lib) para Devengado.");
@@ -484,9 +553,7 @@
   // Eventos
   // ---------------------------
   function bindEvents() {
-    modalCancelar = new bootstrap.Modal(
-      document.getElementById("modalCancelar"),
-    );
+    modalCancelar = new bootstrap.Modal(document.getElementById("modalCancelar"));
     modalGuardar = new bootstrap.Modal(document.getElementById("modalGuardar"));
 
     btnGuardar?.addEventListener("click", (e) => {
@@ -519,15 +586,15 @@
       e.preventDefault();
       try {
         btnConfirmarGuardar.disabled = true;
+
         const data = await guardarDevengado();
         modalGuardar.hide();
 
-        if (data?.folio_oficial) setVal("no_devengado", data.folio_oficial);
-        else if (data?.folio_num)
-          setVal("no_devengado", String(data.folio_num).padStart(6, "0"));
+        // Tu backend regresa { ok:true, id, folio_num, no_devengado } en el routes que me mandaste
+        if (data?.no_devengado) setVal("no_devengado", data.no_devengado);
+        else if (data?.folio_num) setVal("no_devengado", String(data.folio_num).padStart(6, "0"));
 
         alert("Devengado guardado correctamente.");
-        // ✅ NO bloqueamos edición (tú pediste que siempre se pueda ajustar)
       } catch (err) {
         console.error("[DEVENGADO] guardar:", err);
         alert(err?.message || "Error al guardar");
@@ -549,9 +616,7 @@
         modalCancelar.hide();
         mostrarAlertaCancelado();
         deshabilitarFormulario();
-        alert(
-          "Documento cancelado. El monto ha sido devuelto al presupuesto disponible.",
-        );
+        alert("Documento cancelado.");
       } catch (err) {
         console.error("[DEVENGADO] cancelar:", err);
         alert(err?.message || "Error al cancelar");
@@ -578,7 +643,7 @@
       }
     });
 
-    // Buscador
+    // Buscador (si existe nav-search / proj-code)
     const form = document.getElementById("nav-search");
     const input = document.getElementById("proj-code");
     form?.addEventListener("submit", (e) => {
@@ -588,7 +653,7 @@
       window.location.href = `devengado.html?id=${encodeURIComponent(id)}`;
     });
 
-    // Cambio manual del monto_devengado (se limita, aunque manda el total)
+    // Cambio manual del monto_devengado
     document
       .querySelector('[name="monto_devengado"]')
       ?.addEventListener("change", (e) => {

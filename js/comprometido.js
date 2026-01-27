@@ -1,3 +1,4 @@
+// public/js/comprometido.js
 (() => {
   const API = (window.API_URL || "http://localhost:3000").replace(/\/$/, "");
 
@@ -39,20 +40,17 @@
     el.value = value ?? "";
   };
 
-  // ✅ SOLO selecciona si existe opción (NO inventa opciones falsas)
   const setSelectVal = (name, value) => {
     const el = $byName(name);
     if (!el) return;
 
     const v = value == null ? "" : String(value);
 
-    // si es INPUT (no select), asigna directo
     if (el.tagName !== "SELECT") {
       el.value = v;
       return;
     }
 
-    // si es SELECT, solo asigna si existe opción
     const exists = Array.from(el.options).some((o) => String(o.value) === v);
     el.value = exists ? v : "";
   };
@@ -99,32 +97,6 @@
     }
     if (/^\d+$/.test(str)) return str.padStart(6, "0");
     return str;
-  }
-
-  function getMonthCode(dateStr) {
-    if (dateStr && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-      return dateStr.split("-")[1];
-    }
-    const now = new Date();
-    return String(now.getMonth() + 1).padStart(2, "0");
-  }
-
-  function buildFolioNumber(tipo, dateStr, idRef) {
-    const month = getMonthCode(dateStr);
-    const keyId = idRef ? `cp_folio_${tipo}_${idRef}` : "";
-    if (keyId) {
-      const existing = localStorage.getItem(keyId);
-      if (existing) return existing;
-    }
-
-    const seqKey = `cp_folio_seq_${tipo}_${month}`;
-    const last = Number(localStorage.getItem(seqKey) || "0");
-    const next = last + 1;
-    localStorage.setItem(seqKey, String(next));
-
-    const folio = `ECA-${month}-${tipo}-${String(next).padStart(4, "0")}`;
-    if (keyId) localStorage.setItem(keyId, folio);
-    return folio;
   }
 
   // ---------------------------
@@ -182,13 +154,13 @@
               readonly value="${importe}">
           </td>
         </tr>
-        `,
+        `
       );
     });
   }
 
   // ---------------------------
-  // Impuestos (solo lectura)
+  // Impuestos
   // ---------------------------
   function setImpuestoTipo(tipo) {
     const t = String(tipo || "NONE").toUpperCase();
@@ -199,75 +171,6 @@
 
     const tasa = $byName("isr_tasa");
     if (tasa) tasa.disabled = true;
-  }
-
-  // ---------------------------
-  // ✅ CATÁLOGOS (para que NO se vean IDs)
-  // ---------------------------
-  let proyectosById = {}; // { [id]: {id, clave, conac, descripcion} }
-
-  async function loadProyectosCatalog() {
-    const data = await fetchJson(`${API}/api/catalogos/proyectos`, {
-      headers: { ...authHeaders() },
-    });
-
-    proyectosById = {};
-    (Array.isArray(data) ? data : []).forEach((p) => {
-      const id = Number(p.id);
-      if (!Number.isFinite(id)) return;
-      proyectosById[id] = {
-        id,
-        clave: String(p.clave ?? "").trim(),
-        conac: String(p.conac ?? "").trim(),
-        descripcion: String(p.descripcion ?? "").trim(),
-      };
-    });
-
-    // 👇 OJO: en comprometido.html AHORITA es <input name="id_proyecto_programatico">
-    // Si quieres SELECT como en suficiencia, cambia el HTML a <select name="id_proyecto">.
-    const sel = document.querySelector('[name="id_proyecto"]');
-    if (!sel) return; // si no existe, no rompe
-
-    sel.innerHTML = `<option value="">-- Selecciona un proyecto --</option>`;
-    Object.values(proyectosById).forEach((p) => {
-      const opt = document.createElement("option");
-      const clave = String(p.clave || "").trim();
-      const conac = String(p.conac || "").trim();
-      const claveConac = conac ? `${clave} ${conac}` : clave;
-
-      opt.value = String(p.id);
-      opt.textContent = `${claveConac} - ${p.descripcion}`.trim();
-      sel.appendChild(opt);
-    });
-  }
-
-  async function loadFuentesCatalog() {
-    const data = await fetchJson(`${API}/api/catalogos/fuentes`, {
-      headers: { ...authHeaders() },
-    });
-
-    // 👇 Igual: si no existe select 'fuente' porque es input, no rompe.
-    const sel = document.querySelector('[name="fuente"]');
-    if (!sel) return;
-    if (sel.tagName !== "SELECT") return; // si es input, no llenamos options
-
-    sel.innerHTML = `<option value="">-- Selecciona una fuente --</option>`;
-    (Array.isArray(data) ? data : []).forEach((x) => {
-      const id = Number(x.id);
-      if (!Number.isFinite(id)) return;
-      const opt = document.createElement("option");
-      opt.value = String(id);
-      opt.textContent =
-        `${String(x.clave ?? "").trim()} - ${String(x.fuente ?? "").trim()}`.trim();
-      sel.appendChild(opt);
-    });
-  }
-
-  function updateClaveProgDescFromProyectoId(idProyecto) {
-    const descEl = document.getElementById("claveProgDesc");
-    if (!descEl) return;
-    const p = proyectosById[Number(idProyecto)] || null;
-    descEl.textContent = p?.descripcion || "—";
   }
 
   // ---------------------------
@@ -306,6 +209,9 @@
       ieps_tasa: payload.ieps_tasa ?? null,
 
       detalle: Array.isArray(payload.detalle) ? payload.detalle : [],
+
+      // ✅ importante: aquí guardaremos luego el id real del comprometido
+      id_comprometido: payload.id_comprometido ?? null,
     };
   }
 
@@ -321,7 +227,6 @@
           headers: { ...authHeaders() },
         });
 
-        // ✅ TU API regresa { ok:true, data:{...} }
         const payload = data && data.data ? data.data : data;
 
         localStorage.setItem(
@@ -331,22 +236,19 @@
             payload,
             loaded_from: "api",
             loaded_at: new Date().toISOString(),
-          }),
+          })
         );
 
         return payload;
       } catch (e) {
-        console.warn(
-          "[COMPROMETIDO] API falló, usando LocalStorage:",
-          e.message,
-        );
+        console.warn("[COMPROMETIDO] API falló, usando LocalStorage:", e.message);
       }
     }
 
     const raw = localStorage.getItem("cp_last_suficiencia");
     if (!raw) {
       throw new Error(
-        "No hay datos. Primero guarda una Suficiencia o abre comprometido.html?id=XXX",
+        "No hay datos. Primero guarda una Suficiencia o abre comprometido.html?id=XXX"
       );
     }
 
@@ -362,48 +264,29 @@
   // Render
   // ---------------------------
   function renderPayload(rawPayload) {
-    console.log("[COMPROMETIDO] rawPayload:", rawPayload);
     const payload = normalizePayload(rawPayload);
-    console.log("[COMPROMETIDO] normalized:", payload);
-    console.log("[COMPROMETIDO] detalle length:", payload.detalle?.length);
 
-    // Folio
     setVal(
       "no_suficiencia",
-      payload.folio_num != null ? formatFolio(payload.folio_num) : "",
+      payload.folio_num != null ? formatFolio(payload.folio_num) : ""
     );
 
-    // Generales
     setVal("fecha", payload.fecha);
     setVal("dependencia", payload.dependencia);
     setVal("dependencia_aux", payload.dependencia_aux || "");
 
-    // Proyecto y fuente (SELECTs)
-    setSelectVal(
-      "id_proyecto",
-      payload.id_proyecto != null ? String(payload.id_proyecto) : "",
-    );
+    setSelectVal("id_proyecto", payload.id_proyecto != null ? String(payload.id_proyecto) : "");
+    setSelectVal("fuente", payload.id_fuente != null ? String(payload.id_fuente) : "");
 
-    setSelectVal(
-      "fuente",
-      payload.id_fuente != null ? String(payload.id_fuente) : "",
-    );
-
-    // Clave programática (inputs readonly)
     setVal("clave_programatica", payload.clave_programatica || "");
-    setVal("id_proyecto_programatico", payload.clave_programatica || ""); // por compatibilidad
+    setVal("id_proyecto_programatico", payload.clave_programatica || "");
 
-    // Si tienes campo "programa" en comprometido.html
     setVal("programa", payload.programa_text || "");
-
-    // Hidden id_fuente (si existe)
     setVal("id_fuente", payload.id_fuente ?? "");
 
-    // Pago
     setVal("mes_pago", payload.mes_pago || "");
     setVal("cantidad_pago", safeNumber(payload.cantidad_pago).toFixed(2));
 
-    // Totales
     setVal("meta", payload.meta || "");
     setVal("subtotal", safeNumber(payload.subtotal).toFixed(2));
     setVal("iva", safeNumber(payload.iva).toFixed(2));
@@ -412,22 +295,17 @@
     setVal("total", safeNumber(payload.total).toFixed(2));
     setVal("cantidad_con_letra", payload.cantidad_con_letra || "");
 
-    // Impuestos
     setImpuestoTipo(payload.impuesto_tipo);
     setVal("isr_tasa", payload.isr_tasa ?? "");
     setVal("ieps_tasa", payload.ieps_tasa ?? "");
 
-    // Detalle
     renderDetalle(payload.detalle);
-
-    // Descripción bajo clave programática
-    updateClaveProgDescFromProyectoId(payload.id_proyecto);
 
     return payload;
   }
 
   // ---------------------------
-  // PDF (deja tu función real)
+  // PDF (placeholder)
   // ---------------------------
   async function generarPDF(_payload) {
     alert("Aquí conecta tu generador real de PDF (pdf-lib).");
@@ -454,7 +332,6 @@
       }
     });
 
-    // buscador por ID
     const form = document.getElementById("nav-search");
     const input = document.getElementById("proj-code");
     form?.addEventListener("submit", (e) => {
@@ -479,15 +356,31 @@
           ...state.payload,
         };
 
+        // ✅ Guarda comprometido en backend
         const r = await fetchJson(`${API}/api/comprometido`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeaders() },
           body: JSON.stringify(body),
         });
 
-        alert(
-          `Comprometido guardado: ${r.no_comprometido} (folio ${r.folio_num})`,
+        // ✅ PASO 2: guarda el ID real del comprometido en el payload
+        // Tu backend debe devolver r.id (ID tabla comprometidos)
+        if (r?.id) {
+          state.payload.id_comprometido = r.id;
+        }
+
+        // ✅ Guardar en localStorage para devengado
+        localStorage.setItem(
+          "cp_last_comprometido",
+          JSON.stringify({
+            id: String(r.id),          // 👈 ID REAL COMPROMETIDO
+            payload: state.payload,    // 👈 payload con id_comprometido ya puesto
+            loaded_from: "comprometido",
+            loaded_at: new Date().toISOString(),
+          })
         );
+
+        alert(`Comprometido guardado: ${r.no_comprometido} (folio ${r.folio_num})`);
       } catch (err) {
         console.error("[COMPROMETIDO] save error:", err);
         alert(err?.message || "Error al guardar comprometido");
@@ -500,47 +393,37 @@
       e.preventDefault();
 
       const currentPayload = state.payload;
-      const idRef =
-        currentPayload && currentPayload.id ? String(currentPayload.id) : "";
 
-      if (!idRef) {
-        alert("No hay ID para pasar a Devengado.");
+      // ✅ usamos el ID REAL del comprometido
+      const idRef = Number(currentPayload?.id_comprometido || 0);
+
+      if (!idRef || idRef <= 0) {
+        alert("Primero guarda el Comprometido para generar Devengado.");
         return;
       }
 
       localStorage.setItem(
         "cp_last_comprometido",
         JSON.stringify({
-          id: idRef,
+          id: String(idRef),
           payload: currentPayload,
           loaded_from: "comprometido",
           loaded_at: new Date().toISOString(),
-        }),
+        })
       );
 
-      window.location.href = `devengado.html?id=${encodeURIComponent(idRef)}`;
+      window.location.href = `devengado.html?id=${encodeURIComponent(String(idRef))}`;
     });
   }
 
   // ---------------------------
-  // INIT  ✅ PASO 4: catálogos ANTES de render
+  // INIT
   // ---------------------------
   async function init() {
     const state = { payload: null };
 
     try {
-      // ✅ 1) Carga catálogos primero (si tu HTML tiene selects)
-      await loadProyectosCatalog().catch((e) =>
-        console.warn("[COMPROMETIDO] proyectos:", e.message),
-      );
-      await loadFuentesCatalog().catch((e) =>
-        console.warn("[COMPROMETIDO] fuentes:", e.message),
-      );
-
-      // ✅ 2) Carga payload
       const raw = await loadData();
-
-      // ✅ 3) Render
       state.payload = renderPayload(raw);
     } catch (err) {
       console.error("[COMPROMETIDO]", err);

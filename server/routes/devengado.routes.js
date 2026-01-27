@@ -1,472 +1,312 @@
-// server/routes/devengados.routes.js
-import { Router } from "express";
-import { pool } from "../db.js";
+// server/routes/devengado.routes.js
+import express from "express";
+import { query, getClient } from "../db.js";
 
-const router = Router();
+const router = express.Router();
 
-/**
- * Folio oficial: ECA/AÑO/MES/TIPO/ID
- */
-function generarFolioOficial(tipo, id) {
-  const now = new Date();
-  const year = now.getFullYear().toString();
-  const month = (now.getMonth() + 1).toString().padStart(2, "0");
-  const idPadded = String(id).padStart(3, "0");
-  return `ECA/${year}/${month}/${tipo}/${idPadded}`;
+// ---------------------------
+// Helpers (blindaje contra "" en numeric)
+// ---------------------------
+function toNullIfEmpty(v) {
+  const s = String(v ?? "").trim();
+  return s === "" ? null : v;
 }
 
-/**
- * GET /api/devengados/next-folio
- */
-router.get("/next-folio", async (req, res) => {
-  try {
-    const r = await pool.query(`
-      SELECT COALESCE(MAX(folio_devengado),0) + 1 AS folio
-      FROM suficiencias
-      WHERE folio_devengado IS NOT NULL
-    `);
-    return res.json({ folio: Number(r.rows?.[0]?.folio || 1) });
-  } catch (err) {
-    console.error("[next-folio devengado] error:", err);
-    return res
-      .status(500)
-      .json({ error: "Error al obtener folio de devengado" });
-  }
-});
+function toNumOrNull(v) {
+  const s = String(v ?? "").trim();
+  if (s === "") return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
 
-/**
- * GET /api/devengados/por-vencer
- * (Importante: antes de /:id para que no lo capture)
- */
-router.get("/por-vencer", async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT
-        s.id,
-        s.no_suficiencia,
-        s.folio_comprometido,
-        s.fecha_comprometido,
-        s.dependencia,
-        s.total,
-        s.estatus,
-        u.nombre AS usuario,
-        u.email,
-        (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day')::DATE - CURRENT_DATE AS dias_restantes
-      FROM suficiencias s
-      LEFT JOIN usuarios u ON s.id_usuario = u.id
-      WHERE s.estatus = 'VIGENTE'
-      AND s.folio_comprometido IS NOT NULL
-      AND EXTRACT(MONTH FROM s.fecha_comprometido) = EXTRACT(MONTH FROM CURRENT_DATE)
-      AND EXTRACT(YEAR FROM s.fecha_comprometido) = EXTRACT(YEAR FROM CURRENT_DATE)
-      AND (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day')::DATE - CURRENT_DATE <= 5
-      ORDER BY dias_restantes ASC
-    `);
+function toNumOrZero(v) {
+  const s = String(v ?? "").trim();
+  if (s === "") return 0;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : 0;
+}
 
-    return res.json({ total: result.rowCount, documentos: result.rows });
-  } catch (err) {
-    console.error("[API][DEVENGADO POR-VENCER] Error:", err);
-    return res
-      .status(500)
-      .json({ error: "Error consultando documentos por vencer" });
-  }
-});
+function monthCode(dateStr) {
+  const s = String(dateStr || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s.split("-")[1];
+  if (s.includes("T")) return s.split("T")[0].split("-")[1];
+  const now = new Date();
+  return String(now.getMonth() + 1).padStart(2, "0");
+}
 
-/**
- * GET /api/devengados/vigencia/verificar/:id
- */
-router.get("/vigencia/verificar/:id", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ error: "ID inválido" });
-    }
-
-    const result = await pool.query(
-      `
-      SELECT
-        id,
-        fecha_comprometido,
-        estatus,
-        EXTRACT(MONTH FROM fecha_comprometido) AS mes_comprometido,
-        EXTRACT(YEAR FROM fecha_comprometido) AS anio_comprometido,
-        EXTRACT(MONTH FROM CURRENT_DATE) AS mes_actual,
-        EXTRACT(YEAR FROM CURRENT_DATE) AS anio_actual,
-        (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day')::DATE AS fin_mes,
-        (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day')::DATE - CURRENT_DATE AS dias_restantes
-      FROM suficiencias
-      WHERE id = $1
-    `,
-      [id],
-    );
-
-    if (result.rowCount === 0)
-      return res.status(404).json({ error: "Documento no encontrado" });
-
-    const doc = result.rows[0];
-    const vigente =
-      doc.estatus === "VIGENTE" &&
-      parseInt(doc.mes_comprometido) === parseInt(doc.mes_actual) &&
-      parseInt(doc.anio_comprometido) === parseInt(doc.anio_actual);
-
-    return res.json({
-      vigente,
-      estatus: doc.estatus,
-      dias_restantes: parseInt(doc.dias_restantes),
-      fin_mes: doc.fin_mes,
-      mensaje: vigente
-        ? `Documento vigente. Quedan ${doc.dias_restantes} días para el fin del mes.`
-        : doc.estatus !== "VIGENTE"
-          ? `Documento ${doc.estatus}`
-          : "Documento fuera de vigencia (mes anterior)",
-    });
-  } catch (err) {
-    console.error("[API][DEVENGADO VIGENCIA] Error:", err);
-    return res.status(500).json({ error: "Error verificando vigencia" });
-  }
-});
-
-/**
- * POST /api/devengados/vigencia/cancelar-vencidos
- */
-router.post("/vigencia/cancelar-vencidos", async (req, res) => {
-  try {
-    const mesActual = new Date().getMonth() + 1;
-    const anioActual = new Date().getFullYear();
-
-    const result = await pool.query(
-      `
-      UPDATE suficiencias SET
-        estatus = 'CANCELADO_VIGENCIA',
-        fecha_cancelacion = CURRENT_TIMESTAMP,
-        motivo_cancelacion = 'Cancelado automáticamente por exceder vigencia mensual',
-        monto_liberado = COALESCE(monto_devengado, total)
-      WHERE estatus = 'VIGENTE'
-      AND folio_comprometido IS NOT NULL
-      AND (
-        EXTRACT(MONTH FROM COALESCE(fecha_comprometido, fecha)) < $1
-        OR EXTRACT(YEAR FROM COALESCE(fecha_comprometido, fecha)) < $2
-      )
-      RETURNING id, no_suficiencia, folio_comprometido, total
-    `,
-      [mesActual, anioActual],
-    );
-
-    return res.json({
-      success: true,
-      cancelados: result.rowCount,
-      documentos: result.rows,
-      mensaje: `Se cancelaron ${result.rowCount} documentos por exceder vigencia mensual`,
-    });
-  } catch (err) {
-    console.error("[API][DEVENGADO CANCELAR-VENCIDOS] Error:", err);
-    return res
-      .status(500)
-      .json({ error: "Error cancelando documentos vencidos" });
-  }
-});
-
-/**
- * GET /api/devengados/:id
- * Devuelve un devengado existente (cabecera + detalle con importe_devengado)
- */
-router.get("/:id", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    if (!Number.isInteger(id) || id <= 0) {
-      return res.status(400).json({ error: "ID inválido" });
-    }
-
-    const qHead = await pool.query(
-      `
-      SELECT
-        s.id,
-        s.folio_num,
-        s.folio_comprometido,
-        s.folio_devengado,
-        s.folio_oficial_suficiencia,
-        s.folio_oficial_comprometido,
-        s.folio_oficial_devengado,
-        s.no_suficiencia,
-        s.fecha,
-        s.fecha_comprometido,
-        s.fecha_devengado,
-        s.dependencia,
-        s.clave_programatica,
-        s.id_proyecto,
-        s.id_fuente,
-        s.fuente,
-        s.mes_pago,
-        s.total AS monto_comprometido,
-        s.monto_devengado,
-        s.monto_liberado,
-        s.subtotal,
-        s.iva,
-        s.isr,
-        s.isr_tasa,
-        s.total,
-        s.meta,
-        s.cantidad_con_letra,
-        s.estatus,
-        s.fecha_cancelacion,
-        s.motivo_cancelacion,
-        s.firmante_coordinacion,
-        s.firmante_area,
-        s.firmante_direccion,
-        p.nombre AS programa
-      FROM suficiencias s
-      LEFT JOIN proyectos p ON p.id = s.id_proyecto
-      WHERE s.id = $1
-    `,
-      [id],
-    );
-
-    if (qHead.rowCount === 0)
-      return res.status(404).json({ error: "No encontrado" });
-
-    const head = qHead.rows[0];
-
-    const qDet = await pool.query(
-      `
-      SELECT
-        renglon AS no,
-        clave,
-        concepto_partida,
-        justificacion,
-        descripcion,
-        importe AS importe_comprometido,
-        COALESCE(importe_devengado, importe) AS importe
-      FROM suficiencias_detalle
-      WHERE id_suficiencia = $1
-      ORDER BY renglon ASC
-    `,
-      [id],
-    );
-
-    return res.json({ ...head, detalle: qDet.rows || [] });
-  } catch (err) {
-    console.error("[API][DEVENGADO] Error:", err);
-    return res
-      .status(500)
-      .json({ error: "Error interno consultando devengado" });
-  }
-});
-
-/**
- * POST /api/devengados
- * Guarda devengado: actualiza montos + guarda importe_devengado por renglón
- * + guarda firmantes variables en columnas existentes:
- *   firmante_area, firmante_direccion, firmante_coordinacion
- */
+// =====================================================
+// POST /api/devengado
+// Guarda cabecera + detalle en:
+// - devengados
+// - devengado_detalle
+// =====================================================
 router.post("/", async (req, res) => {
+  const client = await getClient();
+
   try {
-    const {
-      id_suficiencia,
-      id_comprometido,
-      fecha_devengado,
+    const b = req.body || {};
 
-      monto_devengado,
-      monto_liberado,
-
-      subtotal,
-      iva,
-      isr,
-      isr_tasa,
-      total,
-      cantidad_con_letra,
-
-      firmante_area,
-      firmante_direccion,
-      firmante_coordinacion,
-
-      detalle,
-    } = req.body;
-
-    const suficienciaId = id_suficiencia || id_comprometido;
-    if (!suficienciaId) {
-      return res
-        .status(400)
-        .json({ error: "ID de suficiencia/comprometido requerido" });
+    // ✅ ID suficiencia (en tu flujo, es el que SIEMPRE tienes)
+    const idSuf = Number(b.id_suficiencia ?? b.id ?? 0);
+    if (!Number.isFinite(idSuf) || idSuf <= 0) {
+      return res.status(400).json({ error: "Falta id_suficiencia válido" });
     }
 
-    const checkResult = await pool.query(
+    // ✅ id_comprometido: si no viene, lo resolvemos por id_suficiencia
+    let idComp = Number(b.id_comprometido ?? 0);
+    if (!Number.isFinite(idComp) || idComp <= 0) {
+      const rFind = await client.query(
+        `
+        SELECT id
+        FROM comprometidos
+        WHERE id_suficiencia = $1
+        ORDER BY id DESC
+        LIMIT 1
+        `,
+        [idSuf],
+      );
+
+      if (!rFind.rowCount) {
+        return res.status(400).json({
+          error:
+            "No existe comprometido para esta suficiencia. Genera primero el Comprometido.",
+        });
+      }
+
+      idComp = Number(rFind.rows[0].id);
+    }
+
+    // ✅ Evita duplicados: 1 devengado por comprometido
+    const exists = await client.query(
       `
-      SELECT id, folio_comprometido, folio_devengado, folio_oficial_devengado,
-             total AS monto_comprometido, estatus
-      FROM suficiencias
-      WHERE id = $1
-    `,
-      [suficienciaId],
+      SELECT id, folio_num, no_devengado
+      FROM devengados
+      WHERE id_comprometido = $1
+      LIMIT 1
+      `,
+      [idComp],
     );
 
-    if (checkResult.rowCount === 0)
-      return res.status(404).json({ error: "Suficiencia no encontrada" });
-
-    const doc = checkResult.rows[0];
-
-    if (!doc.folio_comprometido) {
-      return res
-        .status(400)
-        .json({
-          error:
-            "Este documento no tiene comprometido. Primero debe generarse el comprometido.",
-        });
-    }
-
-    if (doc.estatus === "CANCELADO" || doc.estatus === "CANCELADO_VIGENCIA") {
-      return res
-        .status(400)
-        .json({ error: `No se puede devengar un documento ${doc.estatus}` });
-    }
-
-    if (parseFloat(monto_devengado) > parseFloat(doc.monto_comprometido)) {
-      return res.status(400).json({
-        error: `El monto devengado ($${monto_devengado}) no puede exceder el monto comprometido ($${doc.monto_comprometido})`,
+    if (exists.rowCount) {
+      return res.json({
+        ok: true,
+        already_exists: true,
+        id: exists.rows[0].id,
+        folio_num: exists.rows[0].folio_num,
+        no_devengado: exists.rows[0].no_devengado,
       });
     }
 
-    // Folio devengado si no existe
-    let folioDevengado = doc.folio_devengado;
-    let folioOficialDevengado = doc.folio_oficial_devengado;
-
-    if (!folioDevengado) {
-      const rFolio = await pool.query(`
-        SELECT COALESCE(MAX(folio_devengado),0) + 1 AS folio
-        FROM suficiencias
-        WHERE folio_devengado IS NOT NULL
-      `);
-      folioDevengado = Number(rFolio.rows?.[0]?.folio || 1);
-      folioOficialDevengado = generarFolioOficial("DV", folioDevengado);
-    }
-
-    // Actualiza cabecera (incluye firmantes variables)
-    await pool.query(
+    // ✅ Trae datos del comprometido (fuente confiable)
+    const rComp = await client.query(
       `
-      UPDATE suficiencias SET
-        monto_devengado = $1,
-        monto_liberado = $2,
-        subtotal = COALESCE($3, subtotal),
-        iva = COALESCE($4, iva),
-        isr = COALESCE($5, isr),
-        isr_tasa = COALESCE($6, isr_tasa),
-        total = COALESCE($7, total),
-        cantidad_con_letra = COALESCE($8, cantidad_con_letra),
-        fecha_devengado = COALESCE($9::date, fecha_devengado, CURRENT_DATE),
-        folio_devengado = COALESCE(folio_devengado, $10),
-        folio_oficial_devengado = COALESCE(folio_oficial_devengado, $11),
-
-        firmante_area = COALESCE($12, firmante_area),
-        firmante_direccion = COALESCE($13, firmante_direccion),
-        firmante_coordinacion = COALESCE($14, firmante_coordinacion)
-      WHERE id = $15
-    `,
-      [
-        monto_devengado,
-        monto_liberado,
-        subtotal ?? null,
-        iva ?? null,
-        isr ?? null,
-        isr_tasa ?? null,
-        total ?? null,
-        cantidad_con_letra ?? null,
-        fecha_devengado ?? null,
-        folioDevengado,
-        folioOficialDevengado,
-        firmante_area ?? null,
-        firmante_direccion ?? null,
-        firmante_coordinacion ?? null,
-        suficienciaId,
-      ],
+      SELECT
+        c.id,
+        c.id_suficiencia,
+        c.id_dgeneral,
+        c.id_dauxiliar,
+        c.id_proyecto,
+        c.id_fuente,
+        c.dependencia,
+        c.departamento,
+        c.fuente,
+        c.mes_pago,
+        c.meta,
+        c.clave_programatica,
+        c.impuesto_tipo,
+        c.isr_tasa,
+        c.ieps_tasa,
+        c.subtotal,
+        c.iva,
+        c.isr,
+        c.ieps,
+        c.total,
+        c.cantidad_con_letra
+      FROM comprometidos c
+      WHERE c.id = $1
+      LIMIT 1
+      `,
+      [idComp],
     );
 
-    // Detalle: guarda importe_devengado por renglón
-    if (Array.isArray(detalle)) {
-      for (let i = 0; i < detalle.length; i++) {
-        const item = detalle[i];
-        const renglon = item.no || item.renglon || i + 1;
-        const importeDev = item.importe;
+    if (!rComp.rowCount) {
+      return res.status(404).json({ error: "Comprometido no encontrado" });
+    }
 
-        if (importeDev !== undefined) {
-          await pool.query(
-            `
-            UPDATE suficiencias_detalle SET
-              importe_devengado = $1
-            WHERE id_suficiencia = $2 AND renglon = $3
-          `,
-            [importeDev, suficienciaId, renglon],
-          );
-        }
+    const comp = rComp.rows[0];
+
+    // ✅ Seguridad: que el comprometido corresponda a la misma suficiencia
+    if (Number(comp.id_suficiencia) !== Number(idSuf)) {
+      return res.status(400).json({
+        error:
+          "El id_suficiencia no corresponde al comprometido encontrado. Revisa el flujo.",
+      });
+    }
+
+    // ✅ Validación: total devengado no puede exceder total comprometido
+    const totalComp = toNumOrZero(comp.total);
+    const totalDev = toNumOrZero(b.total ?? b.monto_devengado);
+    if (totalDev > totalComp) {
+      return res.status(400).json({
+        error: `El total devengado (${totalDev}) no puede exceder el comprometido (${totalComp})`,
+      });
+    }
+
+    // ✅ Folio: ECA-<mes>-DV-0001
+    const fechaBase =
+      toNullIfEmpty(b.fecha_devengado ?? b.fecha) ||
+      new Date().toISOString().slice(0, 10);
+
+    const mes = monthCode(fechaBase);
+    const prefijo = `ECA-${mes}-DV-`;
+
+    await client.query("BEGIN");
+    await client.query("LOCK TABLE devengados IN EXCLUSIVE MODE");
+
+    const rConsec = await client.query(
+      `
+      SELECT COALESCE(MAX(RIGHT(no_devengado, 4)::int), 0) + 1 AS consecutivo
+      FROM devengados
+      WHERE no_devengado LIKE $1
+        AND DATE_PART('year', fecha) = DATE_PART('year', $2::date)
+      `,
+      [`${prefijo}%`, fechaBase],
+    );
+
+    const consecutivo = Number(rConsec.rows?.[0]?.consecutivo || 1);
+    const noDevengado = `${prefijo}${String(consecutivo).padStart(4, "0")}`;
+
+    // ✅ Inserta CABECERA
+    const sqlHead = `
+      INSERT INTO devengados (
+        id_comprometido,
+        id_suficiencia,
+        id_usuario,
+
+        id_dgeneral,
+        id_dauxiliar,
+        id_proyecto,
+        id_fuente,
+
+        no_devengado,
+        fecha,
+        dependencia,
+        departamento,
+        fuente,
+        mes_pago,
+        meta,
+        clave_programatica,
+
+        impuesto_tipo,
+        isr_tasa,
+        ieps_tasa,
+        subtotal,
+        iva,
+        isr,
+        ieps,
+        total,
+        cantidad_con_letra
+      )
+      VALUES (
+        $1,$2,$3,
+        $4,$5,$6,$7,
+        $8,$9,$10,$11,$12,$13,$14,$15,
+        $16,$17,$18,$19,$20,$21,$22,$23,$24
+      )
+      RETURNING id, folio_num, no_devengado;
+    `;
+
+    const headParams = [
+      idComp, // $1
+      idSuf, // $2
+      req.user.id, // $3
+
+      comp.id_dgeneral, // $4
+      comp.id_dauxiliar, // $5
+      comp.id_proyecto, // $6
+      comp.id_fuente, // $7
+
+      noDevengado, // $8
+      fechaBase, // $9
+      comp.dependencia, // $10
+      comp.departamento, // $11
+      comp.fuente, // $12
+      comp.mes_pago, // $13
+      comp.meta, // $14
+      comp.clave_programatica, // $15
+
+      comp.impuesto_tipo ?? "NONE", // $16
+
+      // ✅ blindaje numeric como en comprometido
+      toNumOrNull(b.isr_tasa ?? comp.isr_tasa), // $17
+      toNumOrNull(b.ieps_tasa ?? comp.ieps_tasa), // $18
+
+      toNumOrZero(b.subtotal ?? comp.subtotal), // $19
+      toNumOrZero(b.iva ?? comp.iva), // $20
+      toNumOrZero(b.isr ?? comp.isr), // $21
+      toNumOrZero(b.ieps ?? comp.ieps), // $22
+
+      totalDev, // $23
+      toNullIfEmpty(b.cantidad_con_letra ?? comp.cantidad_con_letra), // $24
+    ];
+
+    const rHead = await client.query(sqlHead, headParams);
+    const idDev = Number(rHead.rows[0].id);
+
+    // ✅ Inserta DETALLE (importe editable)
+    const detalle = Array.isArray(b.detalle) ? b.detalle : [];
+    if (detalle.length) {
+      const values = [];
+      const params = [];
+      let i = 1;
+
+      for (let idx = 0; idx < detalle.length; idx++) {
+        const d = detalle[idx] || {};
+        const renglon = Number(d.renglon ?? d.no ?? (idx + 1));
+
+        values.push(
+          `($${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++}, $${i++})`,
+        );
+
+        params.push(
+          idDev,
+          renglon,
+          toNullIfEmpty(d.clave),
+          toNullIfEmpty(d.concepto_partida),
+          toNullIfEmpty(d.justificacion),
+          toNullIfEmpty(d.descripcion),
+          toNumOrZero(d.importe),
+        );
       }
+
+      await client.query(
+        `
+        INSERT INTO devengado_detalle
+          (id_devengado, renglon, clave, concepto_partida, justificacion, descripcion, importe)
+        VALUES ${values.join(",")}
+        `,
+        params,
+      );
     }
 
-    return res.json({
-      success: true,
-      message: "Devengado guardado correctamente",
-      id: suficienciaId,
-      folio_num: folioDevengado,
-      folio_oficial: folioOficialDevengado,
-      monto_liberado: monto_liberado,
-    });
-  } catch (err) {
-    console.error("[API][DEVENGADO POST] Error:", err);
-    return res.status(500).json({ error: "Error interno guardando devengado" });
-  }
-});
-
-/**
- * POST /api/devengados/:id/cancelar
- */
-router.post("/:id/cancelar", async (req, res) => {
-  try {
-    const id = Number(req.params.id);
-    const { motivo } = req.body;
-
-    if (!Number.isInteger(id) || id <= 0)
-      return res.status(400).json({ error: "ID inválido" });
-    if (!motivo || motivo.trim() === "")
-      return res
-        .status(400)
-        .json({ error: "Debe proporcionar un motivo de cancelación" });
-
-    const checkResult = await pool.query(
-      `
-      SELECT id, estatus, total, monto_devengado
-      FROM suficiencias
-      WHERE id = $1
-    `,
-      [id],
-    );
-
-    if (checkResult.rowCount === 0)
-      return res.status(404).json({ error: "Documento no encontrado" });
-
-    const doc = checkResult.rows[0];
-
-    if (doc.estatus === "CANCELADO" || doc.estatus === "CANCELADO_VIGENCIA") {
-      return res.status(400).json({ error: "El documento ya está cancelado" });
-    }
-
-    await pool.query(
-      `
-      UPDATE suficiencias SET
-        estatus = 'CANCELADO',
-        fecha_cancelacion = CURRENT_TIMESTAMP,
-        motivo_cancelacion = $1,
-        monto_liberado = COALESCE(monto_devengado, total)
-      WHERE id = $2
-    `,
-      [motivo.trim(), id],
-    );
+    await client.query("COMMIT");
 
     return res.json({
-      success: true,
-      message: "Documento cancelado correctamente",
-      monto_liberado: doc.monto_devengado || doc.total,
+      ok: true,
+      id: idDev,
+      folio_num: rHead.rows[0].folio_num,
+      no_devengado: rHead.rows[0].no_devengado,
+      id_comprometido: idComp,
+      id_suficiencia: idSuf,
     });
   } catch (err) {
-    console.error("[API][DEVENGADO CANCELAR] Error:", err);
+    await client.query("ROLLBACK");
+    console.error("[POST devengado] error:", err);
     return res
       .status(500)
-      .json({ error: "Error interno cancelando documento" });
+      .json({ error: "Error al guardar devengado", db: err.message });
+  } finally {
+    client.release();
   }
 });
 
