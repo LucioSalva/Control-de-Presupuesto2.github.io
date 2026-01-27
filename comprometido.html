@@ -81,8 +81,8 @@
       </button>
 
       <button id="btn-guardar" class="btn btn-success btn-sm">
-  <i class="bi bi-save me-1"></i>Guardar Comprometido
-</button>
+        <i class="bi bi-save me-1"></i>Guardar Comprometido
+      </button>
 
 
       <button id="btn-ver-devengado" type="button" class="btn btn-outline-primary btn-sm"
@@ -113,8 +113,8 @@
           </tr>
           <tr>
             <td>
-              <input type="text" class="form-control form-control-sm ro ro-folio" style="text-align: end;"
-                name="no_suficiencia" readonly>
+              <input id="noComprometidoTxt" type="text" class="form-control form-control-sm ro ro-folio"
+                style="text-align: end;" name="no_comprometido" readonly>
             </td>
           </tr>
         </table>
@@ -156,27 +156,23 @@
       <tr>
         <th class="table-header">PROYECTO:</th>
         <td>
-          <select class="form-select form-select-sm" name="id_proyecto" disabled>
-            <option value="">-- Selecciona un proyecto --</option>
-          </select>
+          <input type="text" class="form-control" name="proyecto_text" readonly>
+          <input type="hidden" name="id_proyecto">
         </td>
-
         <th class="table-header">FUENTE DE FINANCIAMIENTO:</th>
         <td>
-          <select class="form-select form-select-sm" name="fuente" disabled>
-            <option value="">-- Selecciona una fuente --</option>
-          </select>
+          <input type="text" class="form-control" name="fuente_text" readonly>
           <input type="hidden" name="id_fuente">
         </td>
       </tr>
 
       <tr>
-        <th class="table-header">CLAVE DE LA DEPENDENCIA Y PROGRAMÁTICA:</th>
+        <th class="table-header">CLAVE PROGRAMÁTICA:</th>
         <td>
-          <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="clave_programatica"
-            readonly>
-          <div class="small mt-1 text-muted" id="claveProgDesc">—</div>
+          <div id="claveProgramaticaClave" class="fw-bold"></div>
+          <div id="claveProgramaticaTexto" class="text-muted small"></div>
         </td>
+
 
         <th class="table-header table-header-strong">PROGRAMACIÓN DE PAGO:</th>
         <td>

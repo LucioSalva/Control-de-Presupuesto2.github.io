@@ -172,12 +172,7 @@
  async function buscarPorNumero(numero) {
   const raw = String(numero || "").trim();
   if (!raw) return;
-
-  // si viene folio oficial, mándalo tal cual
-  const isFolioOficial = /^ECA\/\d{4}\/\d{2}\/SP\/\d{1,6}$/i.test(raw);
-  const q = isFolioOficial ? raw : pad6(raw);
-
-  const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(q)}`;
+const url = `${API}/api/suficiencias/buscar?numero=${encodeURIComponent(raw)}`;
   const json = await fetchJson(url, { headers: { ...authHeaders() } });
   renderResultadosBusqueda(json?.data || []);
 }
@@ -356,18 +351,14 @@
       return;
     }
 
-    // ✅ si vienen varias, elegimos
     const opciones = rows
-      .map((r, i) => {
-        const folioNum = String(r.folio_num ?? r.no_suficiencia ?? "").padStart(
-          6,
-          "0",
-        );
-        const folio = `ECA/2026/01/SP/${folioNum}`;
-        const fecha = r.fecha ? String(r.fecha).split("T")[0] : "";
-        return `${i + 1}. ${folio} - ${fecha}`;
-      })
-      .join("\n");
+  .map((r, i) => {
+    const folio = r.no_suficiencia || String(r.folio_num || "").padStart(6, "0");
+    const fecha = r.fecha ? String(r.fecha).split("T")[0] : "";
+    return `${i + 1}. ${folio} - ${fecha}`;
+  })
+  .join("\n");
+
 
     const seleccion = prompt(
       `Se encontraron ${rows.length} suficiencias:\n\n${opciones}\n\nEscribe el número para cargar:`,

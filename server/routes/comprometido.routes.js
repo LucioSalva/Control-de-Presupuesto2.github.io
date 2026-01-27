@@ -1,4 +1,3 @@
-// server/routes/comprometido.routes.js
 import express from "express";
 import { query, getClient } from "../db.js";
 
@@ -31,14 +30,6 @@ function getMonthCode(dateStr) {
   return String(now.getMonth() + 1).padStart(2, "0");
 }
 
-/**
- * ✅ POST /api/comprometido
- * Guarda cabecera + detalle en:
- * - comprometidos
- * - comprometido_detalle
- *
- * Body esperado: { id_suficiencia, ...payloadSuf, detalle: [] }
- */
 router.post("/", async (req, res) => {
   const client = await getClient();
   try {
@@ -49,7 +40,6 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ error: "Falta id_suficiencia válido" });
     }
 
-    // ✅ si ya existe comprometido para esa suficiencia, regresa el existente (evita duplicados)
     const exists = await client.query(
       `SELECT id, folio_num, no_comprometido
        FROM comprometidos
@@ -218,84 +208,53 @@ router.post("/", async (req, res) => {
   }
 });
 
-/**
- * GET /api/comprometido/:id
- * (tu vista de comprometido jala datos desde SUFICIENCIAS para mostrar)
- */
-router.get("/:id", async (req, res) => {
+router.get("/por-suficiencia/:id", async (req, res) => {
+  const { id } = req.params;
+
+  const sql = `
+    SELECT
+      c.id,
+      c.id_suficiencia,
+      c.clave_programatica,
+
+      c.id_proyecto,
+      p.clave        AS proyecto_clave,
+      p.descripcion  AS proyecto_text,
+
+      dg.dependencia AS dependencia_general,
+      da.dependencia AS dependencia_auxiliar,
+
+      c.id_fuente,
+      f.fuente       AS fuente_text,
+
+      c.fecha,
+      c.mes_pago,
+      c.subtotal,
+      c.iva,
+      c.isr,
+      c.total
+
+    FROM comprometidos c
+    LEFT JOIN proyectos p   ON p.id = c.id_proyecto
+    LEFT JOIN dgeneral dg   ON dg.id = c.id_dgeneral
+    LEFT JOIN dauxiliar da  ON da.id = c.id_dauxiliar
+    LEFT JOIN fuentes f     ON f.id = c.id_fuente
+    WHERE c.id_suficiencia = $1
+    LIMIT 1
+  `;
+
   try {
-    const id = Number(req.params.id);
-    if (!Number.isFinite(id) || id <= 0) {
-      return res.status(400).json({ error: "ID inválido" });
+    const { rows } = await query(sql, [id]);
+    if (!rows.length) {
+      return res.status(404).json({ message: "Comprometido no encontrado" });
     }
-
-    const head = await query(
-      `
-      SELECT
-        s.id,
-        s.folio_num,
-        s.no_suficiencia,
-        s.fecha,
-        s.dependencia,
-        s.id_dgeneral,
-        s.id_dauxiliar,
-        s.id_proyecto,
-        s.id_fuente,
-        s.fuente,
-        s.mes_pago,
-        s.clave_programatica,
-        s.meta,
-        s.subtotal,
-        s.iva,
-        s.isr,
-        s.ieps,
-        s.total,
-        s.cantidad_con_letra,
-        s.impuesto_tipo,
-        s.isr_tasa,
-        s.ieps_tasa,
-        s.created_at
-      FROM suficiencias s
-      WHERE s.id = $1
-      LIMIT 1
-      `,
-      [id],
-    );
-
-    if (!head?.rows?.length) {
-      return res.status(404).json({ error: "No encontrado" });
-    }
-
-    const det = await query(
-      `
-      SELECT
-        d.renglon,
-        d.clave,
-        d.concepto_partida,
-        d.justificacion,
-        d.descripcion,
-        d.importe
-      FROM suficiencia_detalle d
-      WHERE d.id_suficiencia = $1
-      ORDER BY d.renglon ASC
-      `,
-      [id],
-    );
-
-    return res.json({
-      ok: true,
-      data: {
-        ...head.rows[0],
-        detalle: det?.rows || [],
-      },
-    });
+    res.json(rows[0]);
   } catch (err) {
-    console.error("[COMPROMETIDO] error:", err);
-    return res.status(500).json({
-      error: "Error interno",
-      db: { message: err.message },
-    });
+    console.error("Comprometido por suficiencia:", err);
+    res.status(500).json({ message: "Error al consultar comprometido" });
   }
 });
+
+
 
 export default router;

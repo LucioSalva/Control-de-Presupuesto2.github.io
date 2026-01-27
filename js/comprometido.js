@@ -8,9 +8,8 @@
   const btnDescargarPdf = document.getElementById("btn-descargar-pdf");
   const btnRecargar = document.getElementById("btn-recargar");
   const detalleBody = document.getElementById("detalleBody");
-  const tipoDocumento = window.location.pathname.includes("devengado")
-    ? "DV"
-    : "CP";
+
+  const tipoDocumento = window.location.pathname.includes("devengado") ? "DV" : "CP";
 
   // ---------------------------
   // AUTH
@@ -40,20 +39,18 @@
     el.value = value ?? "";
   };
 
-  const setSelectVal = (name, value) => {
+  const setReadonlyVal = (name, value) => {
     const el = $byName(name);
     if (!el) return;
-
-    const v = value == null ? "" : String(value);
-
-    if (el.tagName !== "SELECT") {
-      el.value = v;
-      return;
-    }
-
-    const exists = Array.from(el.options).some((o) => String(o.value) === v);
-    el.value = exists ? v : "";
+    el.value = value ?? "";
+    el.readOnly = true;
   };
+
+  function setTextById(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = value ?? "";
+  }
 
   function safeNumber(n) {
     const x = Number(n);
@@ -70,7 +67,12 @@
     } catch {}
 
     if (!r.ok) {
-      const msg = data?.error || data?.message || `HTTP ${r.status} en ${url}`;
+      const msg =
+        data?.db?.message ||
+        data?.db ||
+        data?.error ||
+        data?.message ||
+        `HTTP ${r.status} en ${url}`;
       throw new Error(msg);
     }
     return data;
@@ -92,11 +94,63 @@
   function formatFolio(raw) {
     const str = String(raw ?? "").trim();
     if (!str) return "";
+    // Si viene estilo ECA-01-SP-0004, cambia SP por CP/DV dependiendo pantalla
     if (str.includes("-")) {
       return str.replace(/-(SP|CP|DV)-/, `-${tipoDocumento}-`);
     }
     if (/^\d+$/.test(str)) return str.padStart(6, "0");
     return str;
+  }
+
+  // ---------------------------
+  // Catálogos (para mostrar texto bonito)
+  // ---------------------------
+  let proyectosById = {}; // { [id]: "0108050103 E - Innovación gubernamental..." }
+  let fuentesById = {};   // { [id]: "110101 - INGRESOS PROPIOS..." }
+
+  async function loadCatalogos() {
+    // Ojo: tus endpoints ya existen porque en suficiencia los usas:
+    // /api/catalogos/proyectos
+    // /api/catalogos/fuentes
+    const [proys, fuents] = await Promise.all([
+      fetchJson(`${API}/api/catalogos/proyectos`, { headers: { ...authHeaders() } }),
+      fetchJson(`${API}/api/catalogos/fuentes`,   { headers: { ...authHeaders() } }),
+    ]);
+
+    proyectosById = {};
+    (Array.isArray(proys) ? proys : []).forEach((p) => {
+      const id = Number(p.id);
+      if (!Number.isFinite(id)) return;
+
+      const clave = String(p.clave ?? "").trim();
+      const conac = String(p.conac ?? "").trim();
+      const desc  = String(p.descripcion ?? "").trim();
+
+      const claveConac = conac ? `${clave} ${conac}` : clave;
+      const label = `${claveConac} - ${desc}`.trim();
+      proyectosById[id] = label;
+    });
+
+    fuentesById = {};
+    (Array.isArray(fuents) ? fuents : []).forEach((f) => {
+      const id = Number(f.id);
+      if (!Number.isFinite(id)) return;
+
+      const clave = String(f.clave ?? "").trim();
+      const fuente = String(f.fuente ?? f.descripcion ?? "").trim();
+      const label = `${clave} - ${fuente}`.trim();
+      fuentesById[id] = label;
+    });
+  }
+
+  function getProyectoLabel(idProyecto) {
+    const id = Number(idProyecto);
+    return Number.isFinite(id) ? (proyectosById[id] || "") : "";
+  }
+
+  function getFuenteLabel(idFuente) {
+    const id = Number(idFuente);
+    return Number.isFinite(id) ? (fuentesById[id] || "") : "";
   }
 
   // ---------------------------
@@ -128,27 +182,22 @@
             <input class="form-control form-control-sm as-text td-text input-no-click text-center"
               readonly value="${i}">
           </td>
-
           <td style="width: 12%;">
             <input class="form-control form-control-sm as-text td-text input-no-click"
               readonly value="${String(r?.clave ?? "").trim()}">
           </td>
-
           <td style="width: 20%;">
             <input class="form-control form-control-sm as-text td-text input-no-click"
               readonly value="${String(r?.concepto_partida ?? "").trim()}">
           </td>
-
           <td style="width: 20%;">
             <input class="form-control form-control-sm as-text td-text input-no-click"
               readonly value="${String(r?.justificacion ?? "").trim()}">
           </td>
-
           <td style="width: 33%;">
             <input class="form-control form-control-sm as-text td-text input-no-click"
               readonly value="${String(r?.descripcion ?? "").trim()}">
           </td>
-
           <td style="width: 10%;">
             <input class="form-control form-control-sm as-text td-text input-no-click text-end"
               readonly value="${importe}">
@@ -160,17 +209,20 @@
   }
 
   // ---------------------------
-  // Impuestos
+  // Impuestos (solo lectura)
   // ---------------------------
   function setImpuestoTipo(tipo) {
     const t = String(tipo || "NONE").toUpperCase();
     const radios = document.querySelectorAll(`input[name="impuesto_tipo"]`);
     radios.forEach((r) => {
       r.checked = String(r.value).toUpperCase() === t;
+      r.disabled = true;
     });
 
-    const tasa = $byName("isr_tasa");
-    if (tasa) tasa.disabled = true;
+    const isr = $byName("isr_tasa");
+    const ieps = $byName("ieps_tasa");
+    if (isr) isr.readOnly = true;
+    if (ieps) ieps.readOnly = true;
   }
 
   // ---------------------------
@@ -180,18 +232,22 @@
     const payload = p || {};
     return {
       id: payload.id ?? null,
-      folio_num: payload.folio_num ?? payload.no_suficiencia ?? null,
+
+      // folios
+      no_suficiencia: payload.no_suficiencia ?? payload.folio_suficiencia ?? "",
+      no_comprometido: payload.no_comprometido ?? "",
 
       fecha: formatFecha(payload.fecha),
       dependencia: payload.dependencia ?? "",
-      dependencia_aux: payload.dependencia_aux ?? "",
+      dependencia_aux: payload.dependencia_aux ?? payload.departamento ?? "",
+
       id_dgeneral: payload.id_dgeneral ?? null,
       id_dauxiliar: payload.id_dauxiliar ?? null,
 
       id_proyecto: payload.id_proyecto ?? null,
       id_fuente: payload.id_fuente ?? null,
-      clave_programatica: payload.clave_programatica ?? "",
 
+      clave_programatica: payload.clave_programatica ?? "",
       mes_pago: payload.mes_pago ?? "",
 
       meta: payload.meta ?? payload.justificacion_general ?? "",
@@ -205,12 +261,12 @@
 
       cantidad_con_letra: payload.cantidad_con_letra ?? "",
       impuesto_tipo: payload.impuesto_tipo ?? "NONE",
-      isr_tasa: payload.isr_tasa ?? null,
-      ieps_tasa: payload.ieps_tasa ?? null,
+      isr_tasa: payload.isr_tasa ?? "",
+      ieps_tasa: payload.ieps_tasa ?? "",
 
       detalle: Array.isArray(payload.detalle) ? payload.detalle : [],
 
-      // ✅ importante: aquí guardaremos luego el id real del comprometido
+      // para link a devengado
       id_comprometido: payload.id_comprometido ?? null,
     };
   }
@@ -223,12 +279,13 @@
 
     if (id) {
       try {
-        const data = await fetchJson(`${API}/api/comprometido/${id}`, {
+        const data = await fetchJson(`${API}/api/comprometido/por-suficiencia/${id}`, {
           headers: { ...authHeaders() },
         });
 
         const payload = data && data.data ? data.data : data;
 
+        // cache para fallback
         localStorage.setItem(
           "cp_last_suficiencia",
           JSON.stringify({
@@ -247,57 +304,60 @@
 
     const raw = localStorage.getItem("cp_last_suficiencia");
     if (!raw) {
-      throw new Error(
-        "No hay datos. Primero guarda una Suficiencia o abre comprometido.html?id=XXX"
-      );
+      throw new Error("No hay datos. Primero guarda una Suficiencia o abre comprometido.html?id=XXX");
     }
 
     const obj = JSON.parse(raw);
-    if (!obj || !obj.payload) {
-      throw new Error("cp_last_suficiencia no contiene payload válido.");
-    }
+    if (!obj || !obj.payload) throw new Error("cp_last_suficiencia no contiene payload válido.");
 
     return obj.payload;
   }
 
   // ---------------------------
-  // Render
+  // Render principal (sin selects, todo readonly)
   // ---------------------------
   function renderPayload(rawPayload) {
     const payload = normalizePayload(rawPayload);
 
-    setVal(
-      "no_suficiencia",
-      payload.folio_num != null ? formatFolio(payload.folio_num) : ""
-    );
+    // folio comprometido (si aún no existe, queda vacío)
+    setReadonlyVal("no_comprometido", payload.no_comprometido || "");
 
-    setVal("fecha", payload.fecha);
-    setVal("dependencia", payload.dependencia);
-    setVal("dependencia_aux", payload.dependencia_aux || "");
+    // cabecera
+    setReadonlyVal("fecha", payload.fecha);
+    setReadonlyVal("dependencia", payload.dependencia);
+    setReadonlyVal("dependencia_aux", payload.dependencia_aux);
 
-    setSelectVal("id_proyecto", payload.id_proyecto != null ? String(payload.id_proyecto) : "");
-    setSelectVal("fuente", payload.id_fuente != null ? String(payload.id_fuente) : "");
-
-    setVal("clave_programatica", payload.clave_programatica || "");
-    setVal("id_proyecto_programatico", payload.clave_programatica || "");
-
-    setVal("programa", payload.programa_text || "");
+    // ids ocultos (si los tienes en HTML)
+    setVal("id_proyecto", payload.id_proyecto ?? "");
     setVal("id_fuente", payload.id_fuente ?? "");
 
-    setVal("mes_pago", payload.mes_pago || "");
-    setVal("cantidad_pago", safeNumber(payload.cantidad_pago).toFixed(2));
+    // ✅ Mostrar texto bonito en inputs readonly
+    // (Asegúrate de tener estos inputs en HTML: name="proyecto_text" y name="fuente_text")
+    const proyLabel = getProyectoLabel(payload.id_proyecto);
+    const fuenteLabel = getFuenteLabel(payload.id_fuente);
 
-    setVal("meta", payload.meta || "");
-    setVal("subtotal", safeNumber(payload.subtotal).toFixed(2));
-    setVal("iva", safeNumber(payload.iva).toFixed(2));
-    setVal("isr", safeNumber(payload.isr).toFixed(2));
-    setVal("ieps", safeNumber(payload.ieps).toFixed(2));
-    setVal("total", safeNumber(payload.total).toFixed(2));
-    setVal("cantidad_con_letra", payload.cantidad_con_letra || "");
+    setReadonlyVal("proyecto_text", proyLabel || "");
+    setReadonlyVal("fuente_text", fuenteLabel || "");
+
+    // clave programática + descripción
+    setTextById("claveProgramaticaClave", payload.clave_programatica || "");
+    // si quieres que debajo aparezca la descripción del proyecto como en suficiencia:
+    setTextById("claveProgramaticaTexto", proyLabel ? proyLabel.split(" - ").slice(1).join(" - ") : "—");
+
+    setReadonlyVal("mes_pago", payload.mes_pago || "");
+    setReadonlyVal("cantidad_pago", safeNumber(payload.cantidad_pago).toFixed(2));
+
+    setReadonlyVal("meta", payload.meta || "");
+    setReadonlyVal("subtotal", safeNumber(payload.subtotal).toFixed(2));
+    setReadonlyVal("iva", safeNumber(payload.iva).toFixed(2));
+    setReadonlyVal("isr", safeNumber(payload.isr).toFixed(2));
+    setReadonlyVal("ieps", safeNumber(payload.ieps).toFixed(2));
+    setReadonlyVal("total", safeNumber(payload.total).toFixed(2));
+    setReadonlyVal("cantidad_con_letra", payload.cantidad_con_letra || "");
 
     setImpuestoTipo(payload.impuesto_tipo);
-    setVal("isr_tasa", payload.isr_tasa ?? "");
-    setVal("ieps_tasa", payload.ieps_tasa ?? "");
+    setReadonlyVal("isr_tasa", payload.isr_tasa ?? "");
+    setReadonlyVal("ieps_tasa", payload.ieps_tasa ?? "");
 
     renderDetalle(payload.detalle);
 
@@ -325,24 +385,15 @@
 
     btnRecargar?.addEventListener("click", async () => {
       try {
-        const payload = await loadData();
-        state.payload = renderPayload(payload);
+        const raw = await loadData();
+        state.payload = renderPayload(raw);
       } catch (err) {
         alert(err?.message || "No se pudo recargar");
       }
     });
 
-    const form = document.getElementById("nav-search");
-    const input = document.getElementById("proj-code");
-    form?.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const id = String(input?.value || "").trim();
-      if (!id) return;
-      window.location.href = `comprometido.html?id=${encodeURIComponent(id)}`;
-    });
-
+    // Guardar comprometido
     const btnGuardar = document.getElementById("btn-guardar");
-
     btnGuardar?.addEventListener("click", async (e) => {
       e.preventDefault();
       try {
@@ -356,25 +407,24 @@
           ...state.payload,
         };
 
-        // ✅ Guarda comprometido en backend
         const r = await fetchJson(`${API}/api/comprometido`, {
           method: "POST",
           headers: { "Content-Type": "application/json", ...authHeaders() },
           body: JSON.stringify(body),
         });
 
-        // ✅ PASO 2: guarda el ID real del comprometido en el payload
-        // Tu backend debe devolver r.id (ID tabla comprometidos)
-        if (r?.id) {
-          state.payload.id_comprometido = r.id;
+        if (r?.id) state.payload.id_comprometido = Number(r.id);
+
+        if (r?.no_comprometido) {
+          state.payload.no_comprometido = r.no_comprometido;
+          setReadonlyVal("no_comprometido", r.no_comprometido);
         }
 
-        // ✅ Guardar en localStorage para devengado
         localStorage.setItem(
           "cp_last_comprometido",
           JSON.stringify({
-            id: String(r.id),          // 👈 ID REAL COMPROMETIDO
-            payload: state.payload,    // 👈 payload con id_comprometido ya puesto
+            id: String(r.id),
+            payload: state.payload,
             loaded_from: "comprometido",
             loaded_at: new Date().toISOString(),
           })
@@ -387,15 +437,19 @@
       }
     });
 
+    // Ir a Devengado
     const btnVerDevengado = document.getElementById("btn-ver-devengado");
-
     btnVerDevengado?.addEventListener("click", (e) => {
       e.preventDefault();
 
-      const currentPayload = state.payload;
+      let idRef = Number(state.payload?.id_comprometido || 0);
 
-      // ✅ usamos el ID REAL del comprometido
-      const idRef = Number(currentPayload?.id_comprometido || 0);
+      if (!idRef) {
+        try {
+          const last = JSON.parse(localStorage.getItem("cp_last_comprometido"));
+          idRef = Number(last?.id || 0);
+        } catch {}
+      }
 
       if (!idRef || idRef <= 0) {
         alert("Primero guarda el Comprometido para generar Devengado.");
@@ -406,7 +460,7 @@
         "cp_last_comprometido",
         JSON.stringify({
           id: String(idRef),
-          payload: currentPayload,
+          payload: state.payload,
           loaded_from: "comprometido",
           loaded_at: new Date().toISOString(),
         })
@@ -423,7 +477,13 @@
     const state = { payload: null };
 
     try {
+      // 1) carga catálogos para poder pintar labels
+      await loadCatalogos();
+
+      // 2) carga payload
       const raw = await loadData();
+
+      // 3) render
       state.payload = renderPayload(raw);
     } catch (err) {
       console.error("[COMPROMETIDO]", err);
