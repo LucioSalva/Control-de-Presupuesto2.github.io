@@ -1,94 +1,119 @@
-/* ============ 404 PAGE ============ */
+/* ===========================
+   404 — ESTILO INSTITUCIONAL PRO
+=========================== */
 
-.cp-404 {
-  min-height: 100vh;
-  padding-top: 90px;          /* espacio por la navbar fija */
-  background: #f5f5f5;
+:root{
+  --vino:#691c32;
+  --vino-dark:#5a1629;
+  --dorado:#f4b000;
+  --text:#1f2937;
+  --muted:#6b7280;
 }
 
-.cp-404-card {
-  max-width: 520px;
-  width: 100%;
-  background: #ffffff;
-  border-radius: 16px;
-  padding: 32px 26px;
-  margin: 0 16px;
+/* Fondo general */
+.cp-404{
+  min-height:100vh;
+  background:#ffffff;
+  padding:40px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
 }
 
-.cp-404-code {
-  font-size: 74px;
-  font-weight: 800;
-  letter-spacing: 4px;
-  color: #691c32;
-  margin-bottom: 8px;
+/* Card principal */
+.cp-404-card{
+  width:100%;
+  max-width:560px;
+  background:#ffffff;
+  border-radius:18px;
+  padding:48px 36px;
+  box-shadow:
+    0 30px 80px rgba(0,0,0,.08),
+    0 6px 18px rgba(0,0,0,.05);
+  animation: fadeUp .6s ease-out;
 }
 
-.cp-404-code span {
-  color: #f4b000; /* un detalle en amarillo Ecatepec style */
+/* Animación elegante */
+@keyframes fadeUp{
+  from{ opacity:0; transform:translateY(16px); }
+  to{ opacity:1; transform:translateY(0); }
 }
 
-.cp-404-title {
-  font-size: 22px;
-  font-weight: 600;
+/* 404 grande */
+.cp-404-code{
+  font-size:96px;
+  font-weight:900;
+  letter-spacing:6px;
+  color:var(--vino);
+  line-height:1;
+  margin-bottom:16px;
 }
 
-.cp-404-text {
-  font-size: 14px;
-  color: #6c757d;
+.cp-404-code span{
+  color:var(--dorado);
 }
 
-/* Botón vino reutilizable */
-.btn-vino {
-  background-color: #691c32;
-  border-color: #691c32;
-  color: #ffffff;
+/* Título */
+.cp-404-title{
+  font-size:26px;
+  font-weight:700;
+  color:var(--text);
+  margin-bottom:10px;
 }
 
-.btn-vino:hover {
-  background-color: #5a1629;
-  border-color: #5a1629;
-  color: #ffffff;
+/* Texto */
+.cp-404-text{
+  font-size:15px;
+  color:var(--muted);
+  line-height:1.6;
+  margin-bottom:32px;
 }
 
-#mai{
-  padding: 0;
-  margin-top: -5px;
+/* Acciones */
+.cp-404-actions{
+  margin-bottom:26px;
 }
 
-/* ===== Responsivo ===== */
+/* Botón principal */
+.btn-vino{
+  background:linear-gradient(135deg, var(--vino), var(--vino-dark));
+  border:none;
+  color:#ffffff;
+  padding:12px 26px;
+  font-weight:700;
+  border-radius:12px;
+  box-shadow:0 14px 30px rgba(105,28,50,.35);
+  transition:transform .15s ease, box-shadow .15s ease;
+}
 
-/* Smartphone */
-@media (max-width: 767.98px) {
-  .cp-404-card {
-    padding: 24px 18px;
+.btn-vino:hover{
+  transform:translateY(-1px);
+  box-shadow:0 18px 40px rgba(105,28,50,.45);
+  color:#ffffff;
+}
+
+/* Footer discreto */
+.cp-404-footer{
+  font-size:12px;
+  color:#9ca3af;
+  border-top:1px solid #e5e7eb;
+  padding-top:16px;
+}
+
+/* ===========================
+   RESPONSIVE
+=========================== */
+@media(max-width:576px){
+  .cp-404-card{
+    padding:36px 22px;
   }
 
-  .cp-404-code {
-    font-size: 60px;
+  .cp-404-code{
+    font-size:72px;
   }
 
-  .cp-404-title {
-    font-size: 18px;
-  }
-}
-
-/* Tablet */
-@media (min-width: 768px) and (max-width: 1023.98px) {
-  .cp-404-card {
-    max-width: 480px;
-  }
-}
-
-/* Desktop normal */
-@media (min-width: 1024px) and (max-width: 1439.98px) {
-  .cp-404-card {
-    max-width: 540px;
-  }
-}
-
-/* Desktop grande */
-@media (min-width: 1440px) {
-  .cp-404-card {
-    max-width: 600px;
+  .cp-404-title{
+    font-size:20px;
   }
 }

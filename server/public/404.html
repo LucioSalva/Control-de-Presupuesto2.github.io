@@ -1,6 +1,5 @@
 <!doctype html>
 <html lang="es">
-
 <head>
   <meta charset="utf-8">
   <title>Error 404 — Página no encontrada</title>
@@ -14,46 +13,32 @@
 
 <body>
 
-
-  <main id="mai" class="cp-404 d-flex align-items-center justify-content-center">
-    <div class="cp-404-card text-center shadow-sm">
+  <main class="cp-404 d-flex align-items-center justify-content-center">
+    <div class="cp-404-card text-center">
 
       <div class="cp-404-code">
         4<span>0</span>4
       </div>
 
-      <h1 class="cp-404-title mb-2">Página no encontrada</h1>
-      <p class="cp-404-text mb-4">
-        La dirección que escribiste no existe o ya no está disponible.<br>
-        Revisa la URL o regresa al sistema de Control Presupuestal.
+      <h1 class="cp-404-title">Página no encontrada</h1>
+
+      <p class="cp-404-text">
+        La ruta a la que intentas acceder no existe, fue movida
+        o no tienes permisos para verla.
       </p>
 
-      <div class="d-flex flex-wrap gap-2 justify-content-center">
-        
-        <a href="/login.html" class="btn btn-outline-dark">
-          Ir a inicio de sesión
+      <div class="cp-404-actions">
+        <a href="/login.html" class="btn btn-vino btn-lg">
+          ir al login
         </a>
       </div>
+
+      <div class="cp-404-footer">
+        Sistema de Control Presupuestal · H. Ayuntamiento de Ecatepec
+      </div>
+
     </div>
   </main>
 
-  <script>
-    // Ir a index.html
-    document.getElementById('btnVolverPanel')
-      ?.addEventListener('click', () => {
-        window.location.href = 'index.html';
-      });
-
-    // Volver en el historial
-    document.getElementById('btnVolverAtras')
-      ?.addEventListener('click', () => {
-        if (window.history.length > 1) {
-          window.history.back();
-        } else {
-          window.location.href = 'index.html';
-        }
-      });
-  </script>
 </body>
-
 </html>
