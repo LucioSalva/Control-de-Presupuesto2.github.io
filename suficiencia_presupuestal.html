@@ -135,7 +135,7 @@
                   type="button" role="tab">
                   # Suficiencia
                 </button>
-              <!-- </li>
+                <!-- </li>
               <li class="nav-item" role="presentation">
                 <button class="nav-link" id="tab-claves" data-bs-toggle="pill" data-bs-target="#pane-claves"
                   type="button" role="tab">
@@ -150,7 +150,7 @@
                   <div class="col-md-4">
                     <label class="form-label mb-1">Número de suficiencia</label>
                     <input id="txtNumeroSuf" class="form-control" placeholder="ECA-01-SP-0004" maxlength="30">
-<div class="form-text">Ejemplo: ECA-01-SP-0004</div>
+                    <div class="form-text">Ejemplo: ECA-01-SP-0004</div>
 
                   </div>
                   <div class="col-md-8 d-flex gap-2">
@@ -344,18 +344,13 @@
         </th>
 
         <td class="align-middle" style="width:65%;" rowspan="5">
-  <div class="d-flex align-items-center h-100">
-    <!-- ✅ META se llena sola con el NOMBRE/DESCRIPCIÓN del PROYECTO -->
-    <input
-      type="text"
-      class="form-control form-control-sm as-text text-strong td-text"
-      name="meta"
-      placeholder="Se llenará automáticamente al seleccionar el proyecto"
-      readonly
-    />
-    <input type="hidden" name="id_meta" value="">
-  </div>
-</td>
+          <div class="d-flex align-items-center h-100">
+            <!-- ✅ META se llena sola con el NOMBRE/DESCRIPCIÓN del PROYECTO -->
+            <input type="text" class="form-control form-control-sm as-text text-strong td-text" name="meta"
+              placeholder="Se llenará automáticamente al seleccionar el proyecto" readonly />
+            <input type="hidden" name="id_meta" value="">
+          </div>
+        </td>
 
 
         <th class="table-header text-end" style="width:10%; background-color: rgb(180, 180, 180);">SUBTOTAL:</th>
@@ -403,48 +398,30 @@
 
     <div class="d-flex flex-wrap align-items-center justify-content-end gap-3 mb-3">
 
-  <div class="form-check m-0">
-    <input class="form-check-input" type="checkbox" name="imp_iva" id="imp_iva">
-    <label class="form-check-label" for="imp_iva">IVA 16%</label>
-  </div>
+      <div class="form-check m-0">
+        <input class="form-check-input" type="checkbox" name="imp_iva" id="imp_iva">
+        <label class="form-check-label" for="imp_iva">IVA 16%</label>
+      </div>
 
-  <div class="d-flex align-items-center gap-2">
-    <div class="form-check m-0">
-      <input class="form-check-input" type="checkbox" name="imp_isr" id="imp_isr">
-      <label class="form-check-label" for="imp_isr">ISR</label>
+      <div class="d-flex align-items-center gap-2">
+        <div class="form-check m-0">
+          <input class="form-check-input" type="checkbox" name="imp_isr" id="imp_isr">
+          <label class="form-check-label" for="imp_isr">ISR</label>
+        </div>
+        <input type="number" class="form-control form-control-sm text-end" name="isr_tasa" style="width:120px;"
+          placeholder="Ej. 10 %" min="0" max="100" step="0.01" disabled />
+      </div>
+
+      <div class="d-flex align-items-center gap-2">
+        <div class="form-check m-0">
+          <input class="form-check-input" type="checkbox" name="imp_ieps" id="imp_ieps">
+          <label class="form-check-label" for="imp_ieps">IEPS</label>
+        </div>
+        <input type="number" class="form-control form-control-sm text-end" name="ieps_tasa" style="width:120px;"
+          placeholder="Ej. 8 %" min="0" max="100" step="0.01" disabled />
+      </div>
+
     </div>
-    <input
-      type="number"
-      class="form-control form-control-sm text-end"
-      name="isr_tasa"
-      style="width:120px;"
-      placeholder="Ej. 10 %"
-      min="0"
-      max="100"
-      step="0.01"
-      disabled
-    />
-  </div>
-
-  <div class="d-flex align-items-center gap-2">
-    <div class="form-check m-0">
-      <input class="form-check-input" type="checkbox" name="imp_ieps" id="imp_ieps">
-      <label class="form-check-label" for="imp_ieps">IEPS</label>
-    </div>
-    <input
-      type="number"
-      class="form-control form-control-sm text-end"
-      name="ieps_tasa"
-      style="width:120px;"
-      placeholder="Ej. 8 %"
-      min="0"
-      max="100"
-      step="0.01"
-      disabled
-    />
-  </div>
-
-</div>
 
     <br>
 
@@ -499,19 +476,19 @@
       <!-- Fila para firma (espacio arriba + nombre abajo) -->
       <tr>
         <td class="text-center" style="height:25px; vertical-align:bottom; padding:4px;">
-          <input type="text" class="text-center firma-nombre-input"
-                 name="firma_coordinacion_nombre" placeholder="Nombre del firmante"
-                 style="font-size:10px; border:none; background:transparent; width:100%; font-weight:bold; outline:none;">
+          <input type="text" class="text-center firma-nombre-input" name="firma_coordinacion_nombre"
+            placeholder="Nombre del firmante"
+            style="font-size:10px; border:none; background:transparent; width:100%; font-weight:bold; outline:none;">
         </td>
         <td class="text-center" style="height:25px; vertical-align:bottom; padding:4px;">
-          <input type="text" class="text-center firma-nombre-input"
-                 name="firma_area_nombre" placeholder="Nombre del firmante"
-                 style="font-size:10px; border:none; background:transparent; width:100%; font-weight:bold; outline:none;">
+          <input type="text" class="text-center firma-nombre-input" name="firma_area_nombre"
+            placeholder="Nombre del firmante"
+            style="font-size:10px; border:none; background:transparent; width:100%; font-weight:bold; outline:none;">
         </td>
         <td class="text-center" style="height:25px; vertical-align:bottom; padding:4px;">
-          <input type="text" class="text-center firma-nombre-input"
-                 name="firma_direccion_nombre" placeholder="Nombre del firmante"
-                 style="font-size:10px; border:none; background:transparent; width:100%; font-weight:bold; outline:none;">
+          <input type="text" class="text-center firma-nombre-input" name="firma_direccion_nombre"
+            placeholder="Nombre del firmante"
+            style="font-size:10px; border:none; background:transparent; width:100%; font-weight:bold; outline:none;">
         </td>
       </tr>
     </table>
@@ -537,13 +514,13 @@
   </div>
 
   <script src="js/config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-<script src="js/script.js"></script>
-<script src="js/user-info.js"></script>
-<script type="module" src="js/suficiencia_presupuestal.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="js/session-guard.js"></script>
+  <script src="js/script.js"></script>
+  <script src="js/user-info.js"></script>
+  <script type="module" src="js/suficiencia_presupuestal.js"></script>
 
 </body>
 

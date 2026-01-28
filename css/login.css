@@ -1,78 +1,62 @@
-/* Fondo general */
+/* ====== Fondo pro ====== */
 body {
-  background: #f0f2f5;
-  background-image: url("/public/img/logo\ flor.png");
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: 850px;
-  font-family: "Segoe UI", sans-serif;
+  min-height: 100vh;
+  margin: 0;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: linear-gradient(135deg, #1f2937, #111827);
+}
+
+/* Contenedor centrado */
+.login-wrap{
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
 }
 
 /* Tarjeta */
-.login-card {
-  max-width: 420px;
+.login-card{
   width: 100%;
-  background: rgba(255, 255, 255, 0.25);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  max-width: 520px;
+  border: 0;
+  border-radius: 18px;
   overflow: hidden;
+  animation: fadeUp .6s ease-out;
 }
 
-.login-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    120deg,
-    rgba(255, 255, 255, 0.25),
-    rgba(255, 255, 255, 0.05)
-  );
-  pointer-events: none;
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Encabezado */
-.login-header {
-  background: #691c32;
-  color: white;
-  padding: 18px 20px;
-  text-align: center;
-}
-
-.login-header h5 {
-  font-weight: 700;
-  margin: 0;
-}
-
-.login-header small {
-  color: #cbd6e2;
-}
-
-/* Cuerpo */
-.login-body {
-  padding: 30px;
-  background: white;
+/* Marca */
+.brand-logo{
+  height: 78px;
+  object-fit: contain;
 }
 
 /* Inputs */
-.form-control {
-  border-radius: 8px;
+.form-control{
+  border-radius: 12px;
+}
+
+.input-group .btn{
+  border-radius: 12px;
+}
+
+/* Ojito */
+.toggle-pass{
+  cursor: pointer;
 }
 
 /* Botón */
-.btn-login {
-  border-radius: 8px;
-  padding: 10px;
+.btn-login{
+  border-radius: 14px;
+  height: 52px;
   font-weight: 600;
 }
 
 /* Alert */
-#loginError {
-  border-radius: 8px;
-  font-size: 0.9rem;
-  margin-top: -5px;
+#loginError{
+  border-radius: 12px;
 }
-
-

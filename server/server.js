@@ -53,7 +53,14 @@ function parseFakeToken(req) {
   const userId = Number(parts[1]);
   if (!Number.isFinite(userId) || userId <= 0) return null;
 
-  return { token, userId };
+  const ts = Number(parts[2]); // 👈 timestamp del token
+  if (!Number.isFinite(ts) || ts <= 0) return null;
+
+  // ✅ expira si tiene más de 10 min
+  const MAX_AGE_MS = 10 * 60 * 1000;
+  if (Date.now() - ts > MAX_AGE_MS) return null;
+
+  return { token, userId, ts };
 }
 
 async function authRequired(req, res, next) {
