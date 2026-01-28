@@ -3,6 +3,29 @@
 
 <head>
   <meta charset="utf-8">
+  <style>
+    :root {
+      visibility: hidden;
+    }
+  </style>
+
+  <script>
+    (function () {
+      try {
+        const u = localStorage.getItem("cp_usuario");
+        const t = localStorage.getItem("cp_token");
+
+        if (!u || !t) {
+          window.location.replace("login.html");
+          return;
+        }
+
+        document.documentElement.style.visibility = "visible";
+      } catch (e) {
+        document.documentElement.style.visibility = "visible";
+      }
+    })();
+  </script>
   <title>Control de Presupuesto — Administración de Usuarios</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 

@@ -1,10 +1,16 @@
 // js/user-info.js
 
 document.addEventListener("DOMContentLoaded", () => {
+
+  const u = localStorage.getItem("cp_usuario");
+  const t = localStorage.getItem("cp_token");
+  if (!u || !t) {
+    window.location.replace("login.html");
+    return;
+  }
   const info = document.getElementById("userInfo");
   const btnLogout = document.getElementById("btnLogout");
 
-  // Si no existe contenedor, no hacemos nada
   if (!info) return;
 
   const raw = localStorage.getItem("cp_usuario");

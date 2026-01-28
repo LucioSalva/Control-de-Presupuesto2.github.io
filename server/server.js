@@ -24,10 +24,14 @@ const __dirname = path.dirname(__filename);
 // =====================================================
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json());
+
 // =====================================================
 //  STATIC (FRONTEND)
 // =====================================================
 app.use(express.static(path.join(__dirname, "public")));
+app.get("/", (_req, res) => {
+  return res.sendFile(path.join(__dirname, "public", "login.html"));
+});
 app.use("/public", express.static(path.join(__dirname, "..", "public")));
 app.use("/PDF", express.static(path.join(__dirname, "..", "public", "PDF")));
 app.use("/css", express.static(path.join(__dirname, "..", "css")));

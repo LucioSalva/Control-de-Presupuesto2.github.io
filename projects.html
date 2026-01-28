@@ -3,6 +3,29 @@
 
 <head>
   <meta charset="utf-8" />
+  <style>
+    :root {
+      visibility: hidden;
+    }
+  </style>
+
+  <script>
+    (function () {
+      try {
+        const u = localStorage.getItem("cp_usuario");
+        const t = localStorage.getItem("cp_token");
+
+        if (!u || !t) {
+          window.location.replace("login.html");
+          return;
+        }
+
+        document.documentElement.style.visibility = "visible";
+      } catch (e) {
+        document.documentElement.style.visibility = "visible";
+      }
+    })();
+  </script>
   <title>Control de Presupuesto — Proyectos</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
@@ -55,12 +78,12 @@
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link active" href="devengado.html">
+          <a class="nav-link" href="devengado.html">
             <i class="bi bi-check2-square me-1"></i>Devengado
           </a>
         </li>
         <li class="nav-item">
-          <a class="nav-link" href="projects.html">
+          <a class="nav-link active" href="projects.html">
             <i class="bi bi-diagram-3 me-1"></i>Proyectos
           </a>
         </li>
@@ -72,6 +95,8 @@
       </ul>
     </div>
   </nav>
+
+  
   <main class="projects-main container">
     <!-- ROW KPI -->
     <div class="row g-3 mb-3 mt-5" id="kpi-row">
